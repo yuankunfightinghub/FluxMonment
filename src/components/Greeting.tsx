@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+import MomentAvatar from './MomentAvatar';
+
 interface GreetingProps {
     isFocused: boolean;
     category: 'cyber-blue' | 'sunset-orange' | 'neutral';
@@ -66,9 +68,21 @@ export const Greeting: React.FC<GreetingProps> = ({ isFocused, category, isHolid
                         color: getTitleColor(),
                         cursor: 'default',
                         margin: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1px'
                     }}
                 >
-                    Hi, Moment ✦
+                    Hi,
+                    <MomentAvatar
+                        size={28}
+                        mood={showSuccess ? "happy" : "calm"}
+                        status={showSuccess ? "telling" : "idle"}
+                        variant={0}
+                        accentColor={getTitleColor()}
+                        style={{ margin: '0 2px' }}
+                    />
+                    oment ✦
                 </motion.h1>
             </div>
 

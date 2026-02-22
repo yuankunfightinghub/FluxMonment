@@ -1,3 +1,4 @@
+import { getStorage, ref, deleteObject } from 'firebase/storage';
 import type { MediaAttachment } from '../types';
 
 const CLOUDINARY_CLOUD_NAME = 'daml9cbnj';
@@ -5,7 +6,7 @@ const CLOUDINARY_UPLOAD_PRESET = 'y4oxnjmo';
 
 const ALLOWED_TYPES = [
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'video/mp4', 'video/webm', 'video/quicktime',
+    'video/mp4', 'video/webm'
 ];
 const MAX_SIZE_MB = 50;
 
@@ -40,4 +41,24 @@ export async function uploadMedia(file: File, _uid?: string): Promise<MediaAttac
         type: resourceType,
         name: file.name,
     };
+}
+
+/**
+ * Attempts to delete a media file based on its storage reference URL.
+ * Currently, Cloudinary unsigned uploads cannot be deleted from the client directly,
+ * so this is a placeholder or can handle Firebase Storage URLs if migrated.
+ */
+export async function deleteMedia(url: string): Promise<void> {
+    try {
+        if (!url.includes('firebasestorage.googleapis.com')) {
+            console.log(`[Storage] Skipping delete for non-Firebase media: ${url}`);
+            return;
+        }
+
+        const storage = getStorage();
+        const fileRef = ref(storage, url);
+        await deleteObject(fileRef);
+    } catch (e) {
+        console.warn(`[Firebase] Failed to delete media ${url}:`, e);
+    }
 }

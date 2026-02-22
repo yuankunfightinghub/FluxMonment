@@ -1,90 +1,70 @@
 # FluxMoment (流光瞬息) ✦
 
-FluxMoment 是一个极简且富有生命力的「碎片记录」与「灵感捕捉」 Web 应用。它融合了 Notion 极简克制的美学体系和优雅的物理动效，并通过模拟大模型 (Mock LLM) 引擎，让你随时随地抛出的每一丝闪念都能被智能归类、聚合与提取。
+FluxMoment 是一款面向白领与创意工作者的「采样级」碎片信息捕捉工具。它融合了 Notion 极简克制的美学体系和优雅的物理动效，并在后台接入了真正的大语言模型（LLM）与 Firebase 实时云端架构。让你随时随地抛出的每一丝闪念、图片与视频，都能被智能归类、精准聚合与跨端同步，在工作效率与生活仪式感之间取得完美平衡。
 
 ---
 
 ## ✨ 核心特性 (Key Features)
 
 ### 1. 极致双模宇宙 (Work vs Life)
-FluxMoment 能够根据输入的语义信息，自动将你的想法分流至完全不同的色彩结界：
-- **工作模式 (科技蓝, cyber-blue)**：专注于职场效率与进度。它能精准识别产品推进、需求设计、运营增长与沟通协同等专业语境。
-- **生活模式 (落日橙, sunset-orange)**：安放你的日常与情绪体验。它对旅行、影视、美食、运动与亲子陪伴等生活要素保持敏感。
+基于大语言模型的深度理解，FluxMoment 自动将你的泛输入流分频至不同的视觉与语义结界：
+- **工作宇宙 (cyber-blue)**：专注于职场推进。精准识别需求设计、商业化、数据连接、会议协同等专业语境，展现为带有专注标识和蓝色光晕的卡片。
+- **生活宇宙 (sunset-orange)**：安放日常情绪与碎片体验。敏锐感知旅行、饮食、娱乐、亲子陪伴等要素，呈现为慵懒/活泼表情和橙色暖光的感悟卡槽。
 
-### 2. 高维时空聚合引擎 (Smart Topic & Time-Window Aggregation)
-抛弃了粗糙的流水账，系统采用了创新的“隐式主题 + 2小时时间折叠”算法：
-- **主题对齐**：当新记录与历史记录归属同一深层子分类（即使它们没有相同的字眼）。
-- **时间保鲜**：如果记录发生在同一主题的 **2 个小时之内**，系统会自动将片段聚合并接驳进同一张时间轴卡片 (Timeline Card) 中，确保信息结构的整洁。
+### 2. 严苛的高维语义聚合 (1-Hour Smart Aggregation)
+抛弃了粗糙的“同词相聚”与“强行合并”，系统采用了极其智能的连贯性判定：
+- **三要素强制校验**：当你在 **1 小时** 内连续输入时，只有当 AI 判定你的历代记录在「人物」、「事件动作」、「环境上下文」上高度一致时，新记录才会被合并进之前 Timeline 卡片，沉淀为故事线。
+- **极简降噪呈现**：如果事件发生偏移（比如前一秒在开会，后一秒在喝咖啡），系统立即阻断聚合，拆分为独立卡片；并且，若卡片内仅有 1 条独立记录，所有冗余的时间轴线与圆点将被完全隐藏，还你一张纯粹的原子级闪念卡。
 
-### 3. AI 实体标签抽取 (AI Keyword Tagging)
-为了使得回顾与扫视更加直观，分类引擎会从每段零散的话语中智能提取出核心议题标签，并以药丸 (Pills) 形式附着在卡片底部（上限 5 个）。
-*目前支持的专有名词包括但不限于：*
-* **业务线提取**：`商业化`、`AI 助理`、`数据连接` 
-* **动作意图提取**：`需求`、`方案设计`、`发布上线`、`沟通协作`、`运营增长`
-* **生活方式提取**：`亲子时光`、`影视娱乐`、`美食探店`、`运动健康`
+### 3. 多模态云端持久化与秒级同步 (Firebase & Cloud Storage)
+彻底告别单机时代。
+- **Firebase Firestore**：接入 Google Firebase 提供毫秒级的数据上星，利用统一的 `APP_ID` 结构自动为你同步多端工作状态，刷新绝不丢失。
+- **Firebase Storage 图床**：支持将高分辨率图片和本地视频直传云端，以缩略瀑布流形态原生渲染在时间轴内。
 
-### 4. 沉浸拟态动效 (AntiGravity Aesthetics)
-基于纯粹的 React 与 Framer Motion 打造：
-- **弹性胶囊输入框**: 自适应多行延伸，拥有环境感知能力，输入有效字符时高亮指示系统就绪。
-- **灵动流转**: Bento 瀑布流布局支持元素的错位弹射入场，Hover 时会模拟光影交互产生物理 Z 轴悬浮。
-- **极简视觉**: 告别冗杂的界面与文本，核心界面无任何多余边框、标记位或扰人的控件，享受如同白纸一般的输入心流。
+### 4. 深度物理级媒体剥离 (Deep Deletion Engine)
+在极简排版下，当你的鼠标精准悬停至卡片时，将会显露一抹隐秘的删除按钮。
+不留任何赛博垃圾——点击删除不仅会在 Firestore 文档层进行数据秒删与 DOM 乐观卸载；更会并发触发底层 Storage 清理流，彻底回溯并铲除这通对话下所挂载的所有云端图像与视频，帮你的云容量“减负”。
 
-### 5. 阅后即焚式本地储存 (Offline Local Persistence)
-采用 `localStorage` 拦截并序列化你的心流状态。所有的灵感记录完完全全存储在你的本地浏览器中，彻底杜绝隐私外泄（你可以随时通过清除本地缓存清空整个宇宙）。
+### 5. 情绪头像生成 (Dynamic AI Avatars)
+根据你所描述的场景，大模型不仅会分析并打上核心标签（Tags），还会实时在 50+ 种几何变体中（如皇冠、外星人天线、咖啡杯、花环、专注眼镜等）挑选最应景的「情绪头图」，赋予每次记录独一无二的心情铭牌。
 
 ---
 
 ## 🛠 技术栈 (Tech Stack)
 
 * **核心框架**: [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-* **构建生态**: [Vite](https://vitejs.dev/) - 次世代超极速前端构建工具
-* **美学与动效**: Vanilla CSS + [Framer Motion](https://www.framer.com/motion/) (物理弹簧与高级交互)
-* **矢量图标**: [Lucide React](https://lucide.dev/) (清晰干练的无边框图标库)
-* **状态持久性**: Native DOM `localStorage`
+* **构建生态**: [Vite](https://vitejs.dev/)
+* **美学动效**: Vanilla CSS + [Framer Motion](https://www.framer.com/motion/) (物理弹簧体系)
+* **矢量图标**: [Lucide React](https://lucide.dev/)
+* **服务端架构**: [Firebase](https://firebase.google.com/) (Auth / Firestore / Storage)
+* **AI 大脑**: [SiliconFlow API](https://siliconflow.cn/) / OpenAI Schema (通过 `classificationEngine.ts` 接入)
 
 ---
 
-## 🚀 快速开始 (Getting Started)
+## 🚀 快速运行 (Getting Started)
 
-确保你的开发环境已经安装了 `Node.js` (建议 v18 及以上版本)。
+1. **环境准备**
+   确保你安装了 Node.js (v18+) 并在本地准备或注册好了相关的 Firebase 配置。
 
-1. **安装依赖**
+2. **环境变量注入**
+   在根目录下创建 `.env`，按照需求填充属于你的云端与 AI 密钥：
+   ```env
+   VITE_FIREBASE_API_KEY=your_firebase_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_firebase_domain
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   VITE_FIREBASE_APP_ID=your_firebase_app_id
+   # AI 引擎 (SiliconFlow)
+   VITE_SILICONFLOW_API_KEY=your_secret_key
+   ```
+
+3. **启动引擎**
    ```bash
    npm install
-   ```
-
-2. **启动本地开发服务器**
-   ```bash
    npm run dev
    ```
-   随后打开浏览器访问 `http://localhost:5173` 即可开始记录。
-
-3. **构建生产版本**
-   ```bash
-   npm run build
-   ```
-   *产物将生成在 `/dist` 目录中。本项目亦经过特殊验证，可直接将打包后的目录作为 Chrome 浏览器未打包扩展程序 (Manifest / Popup) 接入使用。*
 
 ---
 
-## 📂 核心目录结构指南
-
-```text
-📦 antigravity
- ┣ 📂 src
- ┃ ┣ 📂 components
- ┃ ┃ ┣ 📜 Greeting.tsx        # 顶部动态欢迎语与 Notion 标题排版
- ┃ ┃ ┣ 📜 InputCapsule.tsx    # 核心输入胶囊交互层
- ┃ ┃ ┣ 📜 MomentStream.tsx    # 展示层框架，承载所有的瀑布流卡片
- ┃ ┃ ┗ 📜 TimelineCard.tsx    # 含有 AI 标签以及 2 小时收束时间轴的主体展示卡槽
- ┃ ┣ 📂 utils
- ┃ ┃ ┣ 📜 classificationEngine.ts # 🚨 核心: Mock LLM 主题推断引擎、时间聚合逻辑与标签提取
- ┃ ┃ ┗ 📜 store.ts            # 本地数据层的增删改查
- ┃ ┣ 📜 App.tsx               # 路由顶层控制与状态调度
- ┃ ┣ 📜 index.css             # 统一抛出的 Notion Brand 等设计令牌 (Tokens) 和 CSS
- ┃ ┗ 📜 types.ts              # 应用状态契约定义 (EventThread, EventCategory)
- ┗ 📜 README.md
-```
-
----
-*Created in a transient moment. Build the future, simply.*
+*“让想法在时间轴上悬浮，在云端永生。”*

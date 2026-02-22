@@ -42,3 +42,29 @@ export interface EventThread {
     mood?: MoodType;         // AI-detected emotional tone
     avatarVariant?: number;  // 0–49, determines decoration set
 }
+
+export interface DeepMemoryCard {
+    id: string;
+    time: string;
+    coreSummary: string;
+    poeticInterpretation: string;
+    originalRecord: string;
+    emotionalFeedback: string;
+    bgMediaUrl?: string;
+    bgMediaType?: 'image' | 'video';
+}
+
+export interface EndOfDayTask {
+    id: string;
+    content: string;
+    isCompleted: boolean;
+}
+
+export interface DailyMemoryData {
+    dateStr: string;        // Friendly date display
+    weather: string;        // AI inferred or real-time weather description
+    poeticMessage: string;  // Poetic message to be enclosed in quotes
+    summary: string;        // One-line summary of all moments today
+    deepMemories: DeepMemoryCard[]; // Part 2
+    tasks: EndOfDayTask[];          // Part 4
+}

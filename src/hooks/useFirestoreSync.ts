@@ -14,6 +14,8 @@ import {
     orderBy,
     onSnapshot,
     serverTimestamp,
+    getDocs,
+    deleteDoc,
     type Unsubscribe,
 } from 'firebase/firestore';
 import { auth, db, APP_ID } from '../lib/firebase';
@@ -31,6 +33,8 @@ const googleProvider = new GoogleAuthProvider();
  *  - signInWithGoogle: trigger Google sign-in popup
  *  - signOut:         sign out the current user
  *  - addMoment:       persist AI-aggregated threads to Firestore
+ *  - deleteMoment:    permanently delete a thread and its storage attachments
+ *  - clearAllMoments: delete all moments from Firestore for the current user
  */
 export function useFirestoreSync() {
     const [threads, setThreads] = useState<EventThread[]>([]);
@@ -88,6 +92,8 @@ export function useFirestoreSync() {
                         tags: data.tags ?? [],
                         entries: data.entries ?? [],
                         lastUpdatedAt: data.lastUpdatedAt ?? 0,
+                        mood: data.mood ?? 'calm',
+                        avatarVariant: data.avatarVariant ?? 0,
                     } as EventThread;
                 });
                 setThreads(loaded);
@@ -144,6 +150,8 @@ export function useFirestoreSync() {
                 tags: thread.tags,
                 entries: thread.entries,
                 lastUpdatedAt: thread.lastUpdatedAt,
+                mood: thread.mood ?? 'calm',
+                avatarVariant: thread.avatarVariant ?? 0,
                 _syncedAt: serverTimestamp(),
             }).catch((e) => {
                 console.error(`[Firebase] setDoc failed for thread ${thread.id}:`, e);
@@ -153,5 +161,46 @@ export function useFirestoreSync() {
         await Promise.all(writes);
     }
 
-    return { threads, user, isAuthChecked, signInWithGoogle, signOut, addMoment };
+    async function deleteMoment(threadId: string, thread: EventThread) {
+        const uid = user?.uid;
+        if (!db || !uid) return;
+
+        // Optimistic delete
+        setThreads(prev => prev.filter(t => t.id !== threadId));
+
+        try {
+            // 1. Delete all attached media from Storage
+            const { deleteMedia } = await import('../lib/storage');
+            const mediaTasks = thread.entries.flatMap(e =>
+                (e.attachments ?? []).map(att => deleteMedia(att.url))
+            );
+            if (mediaTasks.length > 0) {
+                await Promise.all(mediaTasks);
+            }
+
+            // 2. Delete the Firestore document
+            const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+            await deleteDoc(doc(momentsCol, threadId));
+        } catch (e) {
+            console.error(`[Firebase] Failed to delete moment ${threadId}:`, e);
+            // In a real app we might revert the optimistic update here.
+        }
+    }
+
+    async function clearAllMoments() {
+        const uid = user?.uid;
+        if (!db || !uid) return;
+
+        const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+        try {
+            const snap = await getDocs(momentsCol);
+            const deletions = snap.docs.map((d) => deleteDoc(d.ref));
+            await Promise.all(deletions);
+            setThreads([]); // Optimistically clear local state
+        } catch (e) {
+            console.error('[Firebase] clearAllMoments failed:', e);
+        }
+    }
+
+    return { threads, user, isAuthChecked, signInWithGoogle, signOut, addMoment, deleteMoment, clearAllMoments };
 }

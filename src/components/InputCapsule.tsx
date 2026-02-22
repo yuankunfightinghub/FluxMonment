@@ -254,27 +254,6 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
 
                 {/* Right: category hint + submit */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AnimatePresence>
-                        {category !== 'neutral' && (
-                            <motion.span
-                                key={category}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                style={{
-                                    fontSize: '11px',
-                                    fontWeight: 500,
-                                    color: category === 'cyber-blue' ? 'var(--color-primary)' : '#e87533',
-                                    background: category === 'cyber-blue' ? 'var(--color-primary-accent-strong)' : 'rgba(232, 117, 51, 0.1)',
-                                    padding: '2px 8px',
-                                    borderRadius: '20px',
-                                    letterSpacing: '0.02em',
-                                }}
-                            >
-                                {category === 'cyber-blue' ? '工作' : '生活'}
-                            </motion.span>
-                        )}
-                    </AnimatePresence>
 
                     <motion.button
                         whileHover={{ scale: hasContent ? 1.06 : 1 }}

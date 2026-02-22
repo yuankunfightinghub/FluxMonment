@@ -1,4 +1,4 @@
-import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType } from '../types';
+import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType, DailyMemoryData } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -81,21 +81,21 @@ function pickAvatarVariant(text: string, categoryName: string): number {
     return hash % 50;
 }
 
-// ─── SiliconFlow API ────────────────────────────────────────────────────────────
-// 用户给定的硅基流动 Key，如果未在环境变量中配置则默认使用传入的 sk-xxxxxxxx
-const SILICONFLOW_API_KEY = (import.meta.env.VITE_SILICONFLOW_API_KEY as string | undefined) || 'sk-xxxxxxxx';
-const SILICONFLOW_ENDPOINT = 'https://api.siliconflow.cn/v1/chat/completions';
-const MODEL_NAME = 'deepseek-ai/DeepSeek-V3'; // 硅基流动支持的强大且便宜的模型
+// ─── LLM API ────────────────────────────────────────────────────────────
+// 默认支持 SiliconFlow，亦可通过环境变量切换至 OpenRouter 等任意兼容 OpenAI 格式的服务
+const LLM_API_KEY = (import.meta.env.VITE_LLM_API_KEY as string | undefined) || (import.meta.env.VITE_SILICONFLOW_API_KEY as string | undefined) || '';
+const LLM_ENDPOINT = (import.meta.env.VITE_LLM_ENDPOINT as string | undefined) || 'https://api.siliconflow.cn/v1/chat/completions';
+const MODEL_NAME = (import.meta.env.VITE_LLM_MODEL as string | undefined) || 'deepseek-ai/DeepSeek-V3';
 
 /**
  * Build the structured prompt for LLM.
  * We pass recent threads so LLM can decide whether to merge.
  */
 function buildPrompt(content: string, existingThreads: EventThread[]): string {
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const ONE_HOUR_MS = 60 * 60 * 1000;
     const now = Date.now();
     const recentThreads = existingThreads
-        .filter(t => now - t.lastUpdatedAt <= TWO_HOURS_MS)
+        .filter(t => now - t.lastUpdatedAt <= ONE_HOUR_MS)
         .map(t => ({ id: t.id, title: t.title, category: t.category.name }));
 
     return `你是一个个人时刻记录助手，分析用户输入的一条记录，返回严格的 JSON 格式分析结果。
@@ -115,33 +115,50 @@ ${recentThreads.length > 0 ? JSON.stringify(recentThreads, null, 2) : '（暂无
   "title": "卡片标题（10字以内，简洁概括这条记录的核心事件，类似新闻标题）",
   "tags": ["关键词1", "关键词2"],
   "mood": "从以下选一个：happy、excited、proud、playful、curious、focused、calm、cozy、tired、adventurous",
+  "avatarVariant": 28,
   "matchedThreadId": "如果语义上应该合并到已有某个话题卡片，填其 id；否则填 null"
 }
 
+关于 avatarVariant，请根据事件、人物、情感等，从以下数字（0-49）中选一个最符合语境的小图标装饰（只填数字）：
+- 学习/工作/专注：27(书生眼镜), 28(耳机), 32(领带), 29(单片眼镜), 38(书本), 4(厨师帽)
+- 饮食/美食：36(咖啡杯), 37(蛋糕)
+- 娱乐/音乐/庆祝：47(音符), 2(皇冠), 40(彩色圆点雨), 26(太阳眼镜)
+- 出行/旅行/户外：5(鸭舌帽), 6(牛仔帽), 8(渔夫帽), 21(小飞机), 22(小火箭), 34(小背包)
+- 天气/自然：17(云朵), 42(下雨云), 43(雪花), 44(闪电)
+- 日常心情/可爱：11(小鸭子), 12(小猫耳), 13(兔耳), 16(彩虹), 41(心形), 35(珍珠项链)
+- ⚠️极度重要：如果是普通的工作、写代码、打卡等没有明显装饰倾向的输入，**绝不要**死板地返回 0！请发挥你的想象力，从以上列表中挑选一款能增加趣味性的挂饰（比如工作可以带 28耳机，或者是 40彩色圆点雨、36咖啡杯）。尽可能少返回 0，让每个瞬间都生动起来！
 注意：
 - tags 最多 5 个。
 - 业务互斥逻辑：对于工作类（cyber-blue），“商业化”、“数据连接”、“AI 助理”是互斥的标签，每条记录只能在 tags 中包含其中【最多一个】。
-- matchedThreadId 只能是上面已有卡片的 id，或 null。
+- 关于 matchedThreadId：非常严格！只有当本次输入与列表中某张历史卡片在【人物】、【事件动作】、【环境/上下文】这三要素上具备高度一致性与场景延续性时，才能填入其 id（进行聚合归属于同一话题）。如果只是类别相同但具体讲的事情截然不同（比如之前在吃面，现在在喝奶茶），则必须返回 null 创建独立卡片！！
 - 仅返回 JSON，不含任何额外说明。`;
 }
 
 
 /**
- * Call SiliconFlow API (OpenAI format) and parse the response into LLMAnalysisResult.
+ * Call generic LLM API (OpenAI format) and parse the response into LLMAnalysisResult.
  */
-async function callSiliconFlow(content: string, existingThreads: EventThread[]): Promise<LLMAnalysisResult> {
+async function callLLMAPI(content: string, existingThreads: EventThread[]): Promise<LLMAnalysisResult> {
     const prompt = buildPrompt(content, existingThreads);
 
-    console.group('🤖 SiliconFlow AI 分析中...');
+    console.group(`🤖 LLM AI 分析中 (${MODEL_NAME})...`);
     console.log('%c[AI] Input Content:', 'color: #9b59b6; font-weight: bold;', content);
     console.log('%c[AI] Generated Prompt:', 'color: #3498db; font-weight: bold;', prompt);
 
-    const res = await fetch(SILICONFLOW_ENDPOINT, {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LLM_API_KEY}`
+    };
+
+    // 如果通过 OpenRouter 调用，推荐带上来源信息
+    if (LLM_ENDPOINT.includes('openrouter.ai')) {
+        headers['HTTP-Referer'] = 'http://localhost:5173';
+        headers['X-Title'] = 'FluxMoment';
+    }
+
+    const res = await fetch(LLM_ENDPOINT, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SILICONFLOW_API_KEY}`
-        },
+        headers,
         body: JSON.stringify({
             model: MODEL_NAME,
             messages: [
@@ -156,15 +173,15 @@ async function callSiliconFlow(content: string, existingThreads: EventThread[]):
     });
 
     if (!res.ok) {
-        console.error('[AI] SiliconFlow 调用失败:', res.status);
+        console.error('[AI] LLM API API 调用失败:', res.status);
         console.groupEnd();
-        throw new Error(`SiliconFlow API 错误 ${res.status}: ${await res.text()}`);
+        throw new Error(`LLM API 错误 ${res.status}: ${await res.text()}`);
     }
 
     const data = await res.json();
     const raw: string = data.choices?.[0]?.message?.content ?? '{}';
 
-    console.log('%c[AI] SiliconFlow Response:', 'color: #2ecc71; font-weight: bold;', raw);
+    console.log('%c[AI] LLM API Response:', 'color: #2ecc71; font-weight: bold;', raw);
     console.groupEnd();
 
     // 解析 JSON
@@ -184,7 +201,17 @@ async function callSiliconFlow(content: string, existingThreads: EventThread[]):
     const matchedThreadId = typeof parsed.matchedThreadId === 'string'
         ? parsed.matchedThreadId
         : null;
-    const avatarVariant = pickAvatarVariant(content, category.name);
+    let avatarVariantNum = pickAvatarVariant(content, category.name);
+    if (parsed.avatarVariant !== undefined && parsed.avatarVariant !== null) {
+        const match = String(parsed.avatarVariant).match(/\d+/);
+        if (match) {
+            const num = parseInt(match[0], 10);
+            if (num >= 0 && num <= 49) {
+                avatarVariantNum = num;
+            }
+        }
+    }
+    const avatarVariant = avatarVariantNum;
 
     // Verify matchedThreadId actually exists in current threads
     const validMatchedId = existingThreads.some(t => t.id === matchedThreadId)
@@ -226,12 +253,12 @@ function regexFallback(content: string, existingThreads: EventThread[]): LLMAnal
     const tags = extractTags(text, isWork);
     const mood = detectMood(text, isWork);
     const avatarVariant = pickAvatarVariant(text, category.name);
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const ONE_HOUR_MS = 60 * 60 * 1000;
     const now = Date.now();
     let matchedThreadId: string | null = null;
     let matchedThreadTitle = title;
     for (const thread of existingThreads) {
-        if (thread.category.name === category.name && now - thread.lastUpdatedAt <= TWO_HOURS_MS) {
+        if (thread.category.name === category.name && now - thread.lastUpdatedAt <= ONE_HOUR_MS) {
             matchedThreadId = thread.id;
             matchedThreadTitle = thread.title;
             break;
@@ -241,16 +268,16 @@ function regexFallback(content: string, existingThreads: EventThread[]): LLMAnal
 }
 
 /**
- * Main dispatcher: try SiliconFlow first, fall back to regex on any error.
+ * Main dispatcher: try LLM API first, fall back to regex on any error.
  */
 async function llmAnalysis(content: string, existingThreads: EventThread[]): Promise<LLMAnalysisResult> {
-    if (SILICONFLOW_API_KEY) {
+    if (LLM_API_KEY) {
         try {
-            const result = await callSiliconFlow(content, existingThreads);
-            console.info('[AI] SiliconFlow 分析完成');
+            const result = await callLLMAPI(content, existingThreads);
+            console.info('[AI] LLM API 分析完成');
             return result;
         } catch (e) {
-            console.warn('[AI] SiliconFlow 调用失败，降级为正则引擎：', e);
+            console.warn('[AI] LLM API 调用失败，降级为正则引擎：', e);
         }
     }
     return regexFallback(content, existingThreads);
@@ -319,4 +346,156 @@ export function predictTopicTheme(text: string): EventCategory['theme'] | 'neutr
     if (/(需求|方案|产品|运营|互联网|开会|汇报|进度|工作|设计|评审|上线|迭代|测试|ai|大模型|商业化|数据|增长)/.test(text)) return 'cyber-blue';
     if (/(周末|休息|阳光|旅行|剧|玩|吃|风景|孩子|宝宝|健身)/.test(text)) return 'sunset-orange';
     return 'neutral';
+}
+
+/**
+ * Generate a Daily Memory summary based on today's threads.
+ * Connects to LLM to extract poetic insights.
+ */
+export async function generateDailySummary(
+    threads: EventThread[],
+    dateContext: string
+): Promise<DailyMemoryData> {
+    const defaultData: DailyMemoryData = {
+        dateStr: dateContext,
+        weather: '晴转多云',
+        poeticMessage: '故事正在收集中...',
+        summary: threads.length > 0
+            ? `今天为您打捞了 ${threads.length} 个瞬间。由于网络波动，AI 暂时无法呈现今日回忆总结。`
+            : '今天是个安静的日子，暂时还没有记录。',
+        deepMemories: [],
+        tasks: []
+    };
+
+    if (threads.length === 0) {
+        return defaultData;
+    }
+
+    if (!LLM_API_KEY) {
+        return defaultData;
+    }
+
+    // Build a structured context for the LLM
+    const timelineEvents = threads.flatMap(t =>
+        t.entries.map(e => ({
+            id: e.id,
+            time: new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+            content: e.content,
+            attachments: e.attachments ? e.attachments.map(a => ({ url: a.url, type: a.type })) : []
+        }))
+    ).sort((a, b) => a.time.localeCompare(b.time));
+
+    // 将 JSON 结构拍平为纯文本以极致节省 Input Token
+    const eventsText = timelineEvents.map(e =>
+        `[${e.time}] (ID: ${e.id}) ${e.content} ${e.attachments.length > 0 ? `(附件: ${e.attachments[0].url}, ${e.attachments[0].type})` : ''}`
+    ).join('\n');
+
+    const prompt = `你是一位极简、克制且富有温度的AI作家（类似原研哉风格）。我们要为用户生成一张"今日记忆卡片"。
+
+日期 ${dateContext}，今日真实记录：
+${eventsText}
+
+请直接输出严格的JSON，要求如下：
+{
+  "weather": "推测天气或氛围，如: 初春微雨（限6字）",
+  "poeticMessage": "诗意感悟寄语（限制20字）",
+  "summary": "克制客观的今日主要事件总结（限制30字）",
+  "deepMemories": [
+    {
+      "id": "提取匹配事件的ID",
+      "time": "HH:mm",
+      "coreSummary": "一句话概括事实",
+      "poeticInterpretation": "诗意的解读（15字内）",
+      "originalRecord": "原文一字不差复制",
+      "emotionalFeedback": "温暖反馈（10字内）",
+      "bgMediaUrl": "附件url（如果有）",
+      "bgMediaType": "image/video（如果有）"
+    }
+  ],
+  "tasks": [
+    {
+       "id": "uuid",
+       "content": "待办事项内容",
+       "isCompleted": true或false
+    }
+  ]
+}
+
+要求：
+1. deepMemories 最多挑选 1 个最令人触动的时刻。严禁捏造虚假回忆！
+2. tasks 仅梳理明确提到的待办，若无则留空数组 []，不要自己瞎编。
+3. 仅返回 JSON，不含任何多余文字。`;
+
+    try {
+        console.group(`🤖 LLM AI 生成今日总结中 (${MODEL_NAME})...`);
+        console.log('%c[AI] Daily Summary Prompt:', 'color: #3498db; font-weight: bold;', prompt);
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${LLM_API_KEY}`
+        };
+
+        if (LLM_ENDPOINT.includes('openrouter.ai')) {
+            headers['HTTP-Referer'] = 'http://localhost:5173';
+            headers['X-Title'] = 'FluxMoment';
+        }
+
+        const res = await fetch(LLM_ENDPOINT, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                model: MODEL_NAME,
+                messages: [
+                    { role: 'system', content: '你是一个严格输出 JSON 的 AI 助手。除了 JSON 数据之外不要输出任何 markdown 格式！' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.5,
+                max_tokens: 1000,
+                response_format: { type: 'json_object' }
+            }),
+            signal: AbortSignal.timeout(60000),
+        });
+
+        if (!res.ok) {
+            console.error('[AI] LLM Summary API 调用失败:', res.status);
+            console.groupEnd();
+            return defaultData;
+        }
+
+        const data = await res.json();
+        const raw: string = data.choices?.[0]?.message?.content ?? '{}';
+
+        console.log('%c[AI] LLM Summary Response:', 'color: #2ecc71; font-weight: bold;', raw);
+        console.groupEnd();
+
+        // Fix potential JSON truncation and markdown blocks
+        let jsonText = raw.trim();
+        jsonText = jsonText.replace(/^```(?:json)?\s*/i, '');
+        jsonText = jsonText.replace(/\s*```\s*$/i, '');
+
+        // Safety fallback if it still got cut off
+        if (!jsonText.endsWith('}')) {
+            jsonText += ']}'; // naive close in case of array cut
+        }
+
+        try {
+            const parsed = JSON.parse(jsonText);
+
+            return {
+                dateStr: dateContext,
+                weather: parsed.weather || defaultData.weather,
+                poeticMessage: parsed.poeticMessage || defaultData.poeticMessage,
+                summary: parsed.summary || defaultData.summary,
+                deepMemories: Array.isArray(parsed.deepMemories) ? parsed.deepMemories : [],
+                tasks: Array.isArray(parsed.tasks) ? parsed.tasks : []
+            };
+        } catch (jsonErr) {
+            console.error('[AI] JSON Parse 失败:', jsonErr, 'Raw Text:', jsonText);
+            return defaultData;
+        }
+
+    } catch (e) {
+        console.warn('[AI] 生成今日总结失败，使用默认值:', e);
+        return defaultData;
+    }
 }

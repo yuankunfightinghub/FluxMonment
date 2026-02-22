@@ -5,13 +5,16 @@ import './App.css';
 import { Greeting } from './components/Greeting';
 import { InputCapsule, type PendingMedia } from './components/InputCapsule';
 import { MomentStream } from './components/MomentStream';
+import { ViewTabs, type TabValue } from './components/ViewTabs';
+import { DailyMemory } from './components/DailyMemory';
 import { processAndAggregateInput, predictTopicTheme } from './utils/classificationEngine';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { uploadMedia } from './lib/storage';
+import { isSameDay } from 'date-fns';
 import type { EventCategory, MediaAttachment } from './types';
 
 function App() {
-  const { threads, user, isAuthChecked, signInWithGoogle, signOut, addMoment } = useFirestoreSync();
+  const { threads, user, isAuthChecked, signInWithGoogle, signOut, addMoment, deleteMoment, clearAllMoments } = useFirestoreSync();
 
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -19,9 +22,22 @@ function App() {
   const [submittedTheme, setSubmittedTheme] = useState<EventCategory['theme'] | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabValue>('moments');
 
   // ── Media state ────────────────────────────────────────────────────────────
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
+
+  // Expose clear tool to the user console for dev purposes
+  useEffect(() => {
+    (window as any).clearTestData = async () => {
+      console.log("Clearing all moments from Firestore...");
+      await clearAllMoments();
+      console.log("Database cleared! Happy testing. ✨");
+    };
+    return () => {
+      delete (window as any).clearTestData;
+    };
+  }, [clearAllMoments]);
 
   useEffect(() => {
     if (inputValue.trim()) {
@@ -233,7 +249,7 @@ function App() {
           showSuccess={showSuccess}
         />
 
-        <div style={{ width: '100%' }}>
+        <div style={{ width: '100%', marginBottom: '24px' }}>
           <InputCapsule
             value={inputValue}
             onChange={setInputValue}
@@ -249,6 +265,8 @@ function App() {
             onRemoveMedia={handleRemoveMedia}
           />
         </div>
+
+        <ViewTabs activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
 
       {/* Moment stream */}
@@ -263,8 +281,13 @@ function App() {
               登录后你的瞬间将跨设备同步 ☁️
             </p>
           </div>
+        ) : activeTab === 'moments' ? (
+          <MomentStream threads={threads} onDelete={async (id) => {
+            const t = threads.find(x => x.id === id);
+            if (t) await deleteMoment(id, t);
+          }} />
         ) : (
-          <MomentStream threads={threads} />
+          <DailyMemory todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, new Date()))} />
         )}
       </div>
     </div>

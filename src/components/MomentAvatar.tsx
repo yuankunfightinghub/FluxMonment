@@ -18,8 +18,7 @@
  * size prop: 渲染尺寸（TimelineCard 中给 40）
  */
 
-import React, { useId } from 'react';
-import { motion, useSpring, useTransform } from 'framer-motion';
+import React from 'react';
 import type { MoodType, AvatarStatus } from '../types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -34,76 +33,119 @@ export interface MomentAvatarProps {
     style?: React.CSSProperties;
 }
 
-// ─── M 路径配置（每种情绪对应一套谷底参数） ──────────────────────────────────
-// viewBox 0 0 16 16
-// 左眼峰: (4, 2)   右眼峰: (12, 2)
-// 谷底中心: (8, valleyY)
-// left控制点: (6, leftCtrl)   right控制点: (10, rightCtrl)
+// ─── 几何纯粹的品牌 'M' 面部图形 (16x16 Grid) ─────────────────────────────────────────
 
-interface MoodPath {
-    valleyY: number;     // 谷底深度（越大=嘴越开）
-    leftCtrl: number;    // 左斜线贝塞尔控制 Y
-    rightCtrl: number;   // 右斜线贝塞尔控制 Y
-    eyeRadius: number;   // 眼点半径
-    eyeLeftShape: 'dot' | 'arc' | 'line';  // 左眼形态
-    eyeRightShape: 'dot' | 'arc' | 'line'; // 右眼形态
-    legBottom: number;   // 两竖腿底端 Y（14 = 全高）
-}
+const BaseLegs = () => (
+    <>
+        <path d="M 3.5 15 C 3.5 10 4.5 5 4.5 3.5" />
+        <path d="M 12.5 15 C 12.5 10 11.5 5 11.5 3.5" />
+    </>
+);
 
-const MOOD: Record<MoodType, MoodPath> = {
-    calm: { valleyY: 6.8, leftCtrl: 6.2, rightCtrl: 6.2, eyeRadius: 0.95, eyeLeftShape: 'dot', eyeRightShape: 'dot', legBottom: 13.5 },
-    happy: { valleyY: 7.8, leftCtrl: 8.5, rightCtrl: 8.5, eyeRadius: 1.1, eyeLeftShape: 'arc', eyeRightShape: 'arc', legBottom: 13.5 },
-    excited: { valleyY: 8.5, leftCtrl: 9.5, rightCtrl: 9.5, eyeRadius: 1.3, eyeLeftShape: 'dot', eyeRightShape: 'dot', legBottom: 13.5 },
-    proud: { valleyY: 7.2, leftCtrl: 7.0, rightCtrl: 7.0, eyeRadius: 1.0, eyeLeftShape: 'arc', eyeRightShape: 'arc', legBottom: 13.5 },
-    playful: { valleyY: 7.5, leftCtrl: 8.0, rightCtrl: 6.5, eyeRadius: 1.0, eyeLeftShape: 'arc', eyeRightShape: 'line', legBottom: 13.5 }, // wink
-    curious: { valleyY: 6.5, leftCtrl: 5.5, rightCtrl: 5.5, eyeRadius: 1.4, eyeLeftShape: 'dot', eyeRightShape: 'dot', legBottom: 13.5 }, // big eyes
-    focused: { valleyY: 6.0, leftCtrl: 4.0, rightCtrl: 4.0, eyeRadius: 0.75, eyeLeftShape: 'line', eyeRightShape: 'line', legBottom: 13.5 }, // flat valley = 直线嘴
-    cozy: { valleyY: 6.8, leftCtrl: 6.8, rightCtrl: 6.8, eyeRadius: 0.9, eyeLeftShape: 'arc', eyeRightShape: 'arc', legBottom: 13.0 }, // 微闭眼
-    tired: { valleyY: 5.5, leftCtrl: 4.2, rightCtrl: 4.2, eyeRadius: 0.7, eyeLeftShape: 'line', eyeRightShape: 'line', legBottom: 12.5 }, // 浅谷=皱眉
-    adventurous: { valleyY: 8.2, leftCtrl: 9.0, rightCtrl: 9.0, eyeRadius: 1.15, eyeLeftShape: 'dot', eyeRightShape: 'dot', legBottom: 14.0 },
+const BaseDots = () => (
+    <>
+        <circle cx="4.5" cy="3.5" r="1.4" fill="#1a1a1a" stroke="none" />
+        <circle cx="11.5" cy="3.5" r="1.4" fill="#1a1a1a" stroke="none" />
+    </>
+);
+
+const BaseBridge = () => (
+    <path d="M 4.5 3.5 C 4.5 14 11.5 14 11.5 3.5" />
+);
+
+// 为确保 M 字符（图标骨架）不被破坏，所有情绪基础必须包含 BaseLegs + BaseBridge
+const StandardM = () => (
+    <>
+        <BaseLegs />
+        <BaseDots />
+        <BaseBridge />
+    </>
+);
+
+const MOOD_SHAPES: Record<MoodType, React.ReactNode> = {
+    calm: <StandardM />,
+    happy: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            {/* 眯着笑的眼睛 */}
+            <path d="M 3.5 3.5 Q 4.5 2 5.5 3.5" />
+            <path d="M 10.5 3.5 Q 11.5 2 12.5 3.5" />
+        </>
+    ),
+    focused: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            {/* 专注的圆点眼，并且加两道小汗滴或专注线 */}
+            <BaseDots />
+            <path d="M 3.5 0 L 3.5 1.5" strokeWidth="0.8" />
+            <path d="M 12.5 0 L 12.5 1.5" strokeWidth="0.8" />
+        </>
+    ),
+    excited: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            {/* 兴奋的大眼睛 */}
+            <circle cx="4.5" cy="3.5" r="1.8" fill="#1a1a1a" stroke="none" />
+            <circle cx="11.5" cy="3.5" r="1.8" fill="#1a1a1a" stroke="none" />
+            <path d="M 3 1 L 4.5 2" strokeWidth="0.8" />
+            <path d="M 13 1 L 11.5 2" strokeWidth="0.8" />
+        </>
+    ),
+    tired: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            {/* 疲惫的平线眼 */}
+            <line x1="3.5" y1="3.5" x2="5.5" y2="3.5" strokeWidth="1.2" />
+            <line x1="10.5" y1="3.5" x2="12.5" y2="3.5" strokeWidth="1.2" />
+        </>
+    ),
+    playful: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            {/* 一大一小眼或眨眼 */}
+            <circle cx="4.5" cy="3.5" r="1.6" fill="#1a1a1a" stroke="none" />
+            <line x1="10.5" y1="3.5" x2="12.5" y2="3.5" strokeWidth="1.2" />
+        </>
+    ),
+    proud: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            <BaseDots />
+            {/* 得意的小脸颊红晕 */}
+            <circle cx="2.5" cy="5.5" r="0.8" fill="#FFA07A" stroke="none" fillOpacity="0.8" />
+            <circle cx="13.5" cy="5.5" r="0.8" fill="#FFA07A" stroke="none" fillOpacity="0.8" />
+        </>
+    ),
+    curious: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            <BaseDots />
+            {/* 好奇的问号特征（这里简化为眼睛稍大＋稍高） */}
+            <circle cx="11.5" cy="2.5" r="1.4" fill="#1a1a1a" stroke="none" />
+        </>
+    ),
+    cozy: (
+        <>
+            <BaseLegs />
+            <BaseBridge />
+            {/* 慵懒放松的弯眼（下弯） */}
+            <path d="M 3.5 3.5 Q 4.5 4.5 5.5 3.5" />
+            <path d="M 10.5 3.5 Q 11.5 4.5 12.5 3.5" />
+        </>
+    ),
+    adventurous: <StandardM />
 };
 
-/** 生成完整 M 路径字符串
- *  结构: 左竖腿 → 左对角 → 左谷曲线 → 右谷曲线 → 右对角 → 右竖腿
- */
-function buildMPath(m: MoodPath): string {
-    const lx = 2.0, rx = 14.0; // 两竖腿 x
-    const lpx = 4.2, lpy = 1.9; // 左峰（左眼）
-    const rpx = 11.8, rpy = 1.9; // 右峰（右眼）
-    const vx = 8.0;
+// ─── ✦ Sparkles（右上角，M 外溢区域，暂做静态处理） ───────────────────────
 
-    return [
-        `M ${lx} ${m.legBottom}`,
-        `L ${lx} 4.5`,                      // 左腿上升
-        `L ${lpx} ${lpy}`,                  // 左对角到左峰
-        `Q 6.0 ${m.leftCtrl} ${vx} ${m.valleyY}`, // 左谷曲线
-        `Q 10.0 ${m.rightCtrl} ${rpx} ${rpy}`,    // 右谷曲线
-        `L ${rx} 4.5`,                      // 右峰到右对角
-        `L ${rx} ${m.legBottom}`,           // 右腿下降
-    ].join(' ');
-}
-
-/** 渲染单个眼睛（叠加在眼峰点上）*/
-function EyeMark({
-    cx, cy, shape, r, color,
-}: { cx: number; cy: number; shape: 'dot' | 'arc' | 'line'; r: number; color: string }) {
-    const sw = r * 1.4;
-    if (shape === 'dot') {
-        return <circle cx={cx} cy={cy} r={r} fill={color} />;
-    }
-    if (shape === 'line') {
-        // 扁平闭眼横线
-        return <line x1={cx - r * 1.1} y1={cy} x2={cx + r * 1.1} y2={cy}
-            stroke={color} strokeWidth={sw} strokeLinecap="round" />;
-    }
-    // arc: 弯弯眼（弧线向上弯 = 开心眯眼）
-    return <path
-        d={`M ${cx - r * 1.1} ${cy + r * 0.3} Q ${cx} ${cy - r * 1.4} ${cx + r * 1.1} ${cy + r * 0.3}`}
-        stroke={color} strokeWidth={sw} strokeLinecap="round" fill="none"
-    />;
-}
-
-// ─── ✦ Sparkles（右上角，M 外溢区域） ─────────────────────────────────────────
+// ─── ✦ 装饰体系 (暂做纯粹偏移处理，保障尺寸正确) ─────────────────────────
 
 function StarShape({ cx, cy, r, fill }: { cx: number; cy: number; r: number; fill: string }) {
     const p = (a: number, rad: number) => ({
@@ -117,32 +159,6 @@ function StarShape({ cx, cy, r, fill }: { cx: number; cy: number; r: number; fil
     }).join(' ');
     return <polygon points={pts} fill={fill} />;
 }
-
-const SparklesOverlay: React.FC<{ status: AvatarStatus; accent: string }> = ({ status, accent }) => {
-    const isActive = status !== 'idle';
-    const stars = [
-        { cx: 14.8, cy: -1.2, r: 0.9, delay: 0 },
-        { cx: 16.2, cy: 0.8, r: 0.62, delay: 0.36 },
-        { cx: 13.6, cy: 0.2, r: 0.48, delay: 0.68 },
-    ];
-    return (
-        <g>
-            {stars.map((s, i) => (
-                <motion.g key={i}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={isActive
-                        ? { opacity: [0, 1, 0], scale: [0.2, 1, 0.2], rotate: [0, 20, 0] }
-                        : { opacity: [0, 0.5, 0], scale: [0.1, 0.65, 0.1] }
-                    }
-                    transition={{ duration: isActive ? 1.0 : 2.6, delay: s.delay, repeat: Infinity, ease: 'easeInOut' as const }}
-                    style={{ originX: `${s.cx}px`, originY: `${s.cy}px` }}
-                >
-                    <StarShape cx={s.cx} cy={s.cy} r={s.r} fill={accent} />
-                </motion.g>
-            ))}
-        </g>
-    );
-};
 
 // ─── 50 种装饰（纯浮空，不遮挡 M 主体） ─────────────────────────────────────
 // 坐标系 0 0 16 16，装饰可 overflow 到 (-3, -5) ~ (19, 18) 区间
@@ -228,9 +244,8 @@ function buildDecals(accent: string): DecoNode[] {
             <path d="M 7 -1.5 Q 5.5 -0.5 5.5 0.5 L 7 -0.5" stroke="#555" strokeWidth="0.35" fill="none" />
             <path d="M 9 -1.5 Q 10.5 -0.5 10.5 0.5 L 9 -0.5" stroke="#555" strokeWidth="0.35" fill="none" />
             <circle cx="8" cy="-3.8" r="0.7" stroke={accent} strokeWidth="0.3" fill={accent} fillOpacity="0.3" /></g>,
-        // 23 机器人天线（中顶）
-        <g key="23"><line x1="8" y1="1.5" x2="8" y2="-2.5" stroke="#888" strokeWidth="0.55" />
-            <circle cx="8" cy="-3" r="0.9" stroke="#888" strokeWidth="0.45" fill={accent} fillOpacity="0.35" /></g>,
+        // 23 取消使用，暂留空槽
+        null,
         // 24 小蜗牛（右峰右）
         <g key="24"><path d="M 12 -0.5 Q 13 -3 15 -3 Q 17 -3 17 -1.5 Q 17 0 15 0 Q 14 0 14 -1 Q 14 -1.8 15 -1.8 Q 15.5 -1.8 15.5 -1.3" stroke="#8B6914" strokeWidth="0.45" fill="none" {...lc} />
             <line x1="12.5" y1="-2" x2="11.5" y2="-3.5" stroke="#8B6914" strokeWidth="0.35" /><circle cx="11.3" cy="-3.7" r="0.35" fill="#8B6914" /></g>,
@@ -329,107 +344,62 @@ function buildDecals(accent: string): DecoNode[] {
     ];
 }
 
+// ─── 50 种装饰（纯浮空，不遮挡主体） ─────────────────────────────────────
+// 坐标系 0 0 16 16，装饰可 overflow 到 (-3, -5) ~ (19, 18) 区间
+// 这里省略大量代码不修改，保持 buildDecals...
+// ... (之前的 buildDecals 完全通过前一个修改块的上部保留了)
+
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
 
 const MomentAvatar: React.FC<MomentAvatarProps> = ({
     variant = 0,
     mood = 'calm',
-    status = 'idle',
     size = 40,
     accentColor = '#006ebc',
     className,
     style,
 }) => {
-    const uid = useId().replace(/:/g, '');
-    const filterId = `msk-${uid}-${variant}`;
-
     const safeVariant = Math.max(0, Math.min(49, Math.round(variant)));
-    const mCfg = MOOD[mood] ?? MOOD.calm;
-    const mPath = buildMPath(mCfg);
+    const activeShapes = MOOD_SHAPES[mood] ?? MOOD_SHAPES.calm;
 
     const decals = React.useMemo(() => buildDecals(accentColor), [accentColor]);
     const decoNode = decals[safeVariant] ?? null;
 
-    // ── 整体容器的状态动画 ──
-    const containerAnim = status === 'idle'
-        ? { scale: [1, 1.02, 1], transition: { duration: 3.5, repeat: Infinity, ease: 'easeInOut' as const } }
-        : status === 'summarizing'
-            ? { y: [0, -1, 0], transition: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' as const } }
-            : { rotate: [-1.2, 1.2, -1.2], transition: { duration: 0.8, repeat: Infinity, ease: 'easeInOut' as const } };
-
-    // ── 眼点的 pulse 动画 ──
-    const eyePulse = status === 'summarizing'
-        ? { scale: [1, 1.5, 1], opacity: [0.8, 1, 0.8], transition: { duration: 0.7, repeat: Infinity, ease: 'easeInOut' as const } }
-        : { scale: [1, 1.15, 1], transition: { duration: 2.8, repeat: Infinity, ease: 'easeInOut' as const } };
-
     return (
-        <motion.div
+        <div
             className={className}
             style={{ width: size, height: size, display: 'inline-block', flexShrink: 0, ...style }}
-            animate={containerAnim}
-            whileHover={{ scale: 1.12, transition: { type: 'spring', stiffness: 380, damping: 18 } }}
         >
+            {/* Pure geometric rendering. Exact 16x16 grid space mapping properly to viewport. */}
             <svg
                 width={size}
                 height={size}
-                viewBox="-3 -6 22 24"
+                viewBox="0 0 16 16"
                 fill="none"
+                stroke="#1a1a1a"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 xmlns="http://www.w3.org/2000/svg"
                 style={{ overflow: 'visible' }}
                 aria-label="Moment"
             >
-                <defs>
-                    {/* 极轻微手绘质感扰动（scale 小，不破坏识别度） */}
-                    <filter id={filterId} x="-15%" y="-15%" width="130%" height="130%">
-                        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="3" seed={safeVariant + 1} result="noise" />
-                        <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.25" xChannelSelector="R" yChannelSelector="G" />
-                    </filter>
-                </defs>
+                {/* ── 主体面部图形 (16x16 Grid) ── */}
+                {activeShapes}
 
-                {/* ── 装饰层（overflow，不走 filter，保持清晰） ── */}
-                <g opacity="0.9">
-                    {decoNode}
-                </g>
+                {/* ── 装饰层（偏移适配新的 4.5 锚点位） ── */}
+                {decoNode && (
+                    <g style={{ transform: 'translate(0.3px, 1.6px)' }}>
+                        {decoNode}
+                    </g>
+                )}
 
-                <g filter={`url(#${filterId})`}>
-                    {/* ── M 主体笔画 (draw-on entry + continuous) ── */}
-                    <motion.path
-                        d={mPath}
-                        stroke="#1a1a1a"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                        /* entry 动画：pathLength 0→1 = 书写感 */
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{
-                            pathLength: status === 'summarizing'
-                                ? [0, 1, 0]
-                                : 1,
-                            opacity: 1,
-                        }}
-                        transition={
-                            status === 'summarizing'
-                                ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' as const }
-                                : { pathLength: { duration: 0.9, ease: 'easeOut' as const }, opacity: { duration: 0.3 } }
-                        }
-                    />
-
-                    {/* ── 左眼（叠加在左峰 4.2, 1.9） ── */}
-                    <motion.g animate={eyePulse} style={{ originX: '4.2px', originY: '1.9px' }}>
-                        <EyeMark cx={4.2} cy={1.9} shape={mCfg.eyeLeftShape} r={mCfg.eyeRadius} color="#1a1a1a" />
-                    </motion.g>
-
-                    {/* ── 右眼（叠加在右峰 11.8, 1.9） ── */}
-                    <motion.g animate={eyePulse} style={{ originX: '11.8px', originY: '1.9px' }}>
-                        <EyeMark cx={11.8} cy={1.9} shape={mCfg.eyeRightShape} r={mCfg.eyeRadius} color="#1a1a1a" />
-                    </motion.g>
-
-                    {/* ── ✦ Sparkles（右上角外侧） ── */}
-                    <SparklesOverlay status={status} accent={accentColor} />
-                </g>
+                {/* ── 极简星（当无其它装饰时致敬图例 TINY SPARKLE 显示微弱的高光星位） ── */}
+                {safeVariant === 0 && (
+                    <path d="M 14.5 0.5 Q 14.5 1.5 15.5 1.5 Q 14.5 1.5 14.5 2.5 Q 14.5 1.5 13.5 1.5 Q 14.5 1.5 14.5 0.5 Z" fill={accentColor} stroke="none" />
+                )}
             </svg>
-        </motion.div>
+        </div>
     );
 };
 
