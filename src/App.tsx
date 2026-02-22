@@ -290,6 +290,20 @@ function App() {
           <DailyMemory todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, new Date()))} />
         )}
       </div>
+
+      {/* Footer */}
+      <div style={{
+        marginTop: 'auto',
+        paddingTop: '40px',
+        paddingBottom: '10px',
+        fontSize: '13px',
+        color: 'var(--text-muted)',
+        textAlign: 'center',
+        fontFamily: 'Inter, sans-serif',
+        opacity: 0.5,
+      }}>
+        ©️2026xxx
+      </div>
     </div>
   );
 }
