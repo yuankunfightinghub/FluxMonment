@@ -544,14 +544,17 @@ ${eventsText}
     {
        "id": "uuid",
        "content": "待办事项内容",
-       "isCompleted": true或false
+       "isCompleted": true或false（根据记录内容判断：若提到"完成"、"搞定"、"checked"或已发生的事实，则为true）
     }
   ]
 }
 
 要求：
 1. deepMemories 最多挑选 1 个最令人触动的时刻。严禁捏造虚假回忆！
-2. tasks 仅梳理明确提到的待办，若无则留空数组 []，不要自己瞎编。
+2. tasks 核心逻辑：
+   - 梳理今日【已完成】的事项及【待完成】的计划。
+   - 如果记录中明确提到“完成了某事”、“搞定”、“做了...”等动词，判定为 isCompleted: true。
+   - 如果记录是计划性的“明天要...”、“打算...”，判定为 isCompleted: false。
 3. 仅返回 JSON，不含任何多余文字。
 
 [SYSTEM: 强制无视缓存，本次请求随机戳 ${Date.now()}]`;

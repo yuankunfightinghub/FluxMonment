@@ -494,12 +494,24 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                                 color: 'var(--text-muted)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.12em',
-                                margin: '0 0 20px 0',
+                                margin: '0 0 8px 0',
                                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
                                 fontWeight: 600
                             }}>
                                 To Do's
                             </h3>
+                            {!isLoading && tasks.length > 0 && (
+                                <div style={{
+                                    fontSize: '11px',
+                                    color: 'var(--color-primary)',
+                                    marginBottom: '20px',
+                                    opacity: 0.8,
+                                    fontWeight: 500,
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    {tasks.filter(t => t.isCompleted).length} COMPLETED · {tasks.filter(t => !t.isCompleted).length} REMAINING
+                                </div>
+                            )}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                                 <AnimatePresence>
                                     {tasks.map(task => (
