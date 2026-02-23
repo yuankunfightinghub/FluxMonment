@@ -41,6 +41,7 @@ export interface EventThread {
     lastUpdatedAt: number;   // Used for sorting cards
     mood?: MoodType;         // AI-detected emotional tone
     avatarVariant?: number;  // 0–49, determines decoration set
+    embedding?: number[];    // Semantic vector embedding for search
 }
 
 export interface DeepMemoryCard {

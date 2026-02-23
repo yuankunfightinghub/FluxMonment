@@ -94,6 +94,8 @@ export function useFirestoreSync() {
                         lastUpdatedAt: data.lastUpdatedAt ?? 0,
                         mood: data.mood ?? 'calm',
                         avatarVariant: data.avatarVariant ?? 0,
+                        // 这里的映射漏掉了 Embedding，导致前端拿不到云端向量
+                        embedding: data.embedding ?? [],
                     } as EventThread;
                 });
                 setThreads(loaded);
@@ -144,7 +146,7 @@ export function useFirestoreSync() {
 
         const writes = updatedThreads.map((thread) => {
             const ref = doc(momentsCol, thread.id);
-            return setDoc(ref, {
+            const dataToSave: any = {
                 title: thread.title,
                 category: thread.category,
                 tags: thread.tags,
@@ -153,7 +155,16 @@ export function useFirestoreSync() {
                 mood: thread.mood ?? 'calm',
                 avatarVariant: thread.avatarVariant ?? 0,
                 _syncedAt: serverTimestamp(),
-            }).catch((e) => {
+            };
+
+            // 安全追加 Embedding 字段
+            if (thread.embedding && thread.embedding.length > 0) {
+                // 有些较新版的 Firebase SDK 推荐使用 vector(array)
+                // 但目前直接存放 number 数组在大量场景下也是符合预期的。
+                dataToSave.embedding = thread.embedding;
+            }
+
+            return setDoc(ref, dataToSave).catch((e) => {
                 console.error(`[Firebase] setDoc failed for thread ${thread.id}:`, e);
             });
         });

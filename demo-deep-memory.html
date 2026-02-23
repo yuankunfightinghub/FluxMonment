@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Memory Card Demos</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background: #f6f5f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            gap: 60px;
+        }
+
+        .demo-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #050505;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .card {
+            position: relative;
+            background: #fdfcf6;
+            border: 1px solid rgba(230, 150, 80, 0.5);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: inset 0 0 40px rgba(220, 180, 140, 0.1), 0 4px 20px rgba(0, 0, 0, 0.03);
+            width: 500px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* 模拟叠放照片的基础样式 */
+        .photo-stack {
+            position: absolute;
+            top: -10px;
+            right: -20px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .photo-under {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 240px;
+            height: 180px;
+            transform: rotate(-4deg);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            background: rgba(253, 252, 246, 0.95);
+            z-index: 0;
+        }
+
+        .photo-top {
+            position: relative;
+            width: 240px;
+            height: 180px;
+            transform: rotate(6deg);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: -4px 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .photo-top img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-glass {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(253, 252, 246, 0.25);
+            backdrop-filter: blur(3px) saturate(130%);
+            -webkit-backdrop-filter: blur(3px) saturate(130%);
+            z-index: 1;
+        }
+
+        /* 卡片文字内容公共样式 */
+        .content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .time-row {
+            font-size: 14px;
+            font-weight: 600;
+            color: #050505;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-row span:last-child {
+            font-weight: 500;
+            color: #777;
+        }
+
+        .poetic {
+            font-size: 18px;
+            color: #050505;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+
+        .original-record {
+            font-size: 13px;
+            color: #37352f;
+            line-height: 1.5;
+            padding-left: 12px;
+            border-left: 2px solid #e1e1e1;
+            background: rgba(0, 0, 0, 0.03);
+            padding: 10px 12px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* === 方案一：空间规避 (左图右文分割) === */
+        /* 通过 max-width 强制折行，避开右上角图片 */
+        .scheme-1 .content {
+            max-width: 60%;
+            /* 给右侧留出 40% 的安全区 */
+        }
+
+        .scheme-1 .original-record {
+            max-width: 90%;
+        }
+
+        /* === 方案二：羽化溶解与文字发光 === */
+        /* 图片左下角添加透明渐变 Mask，同时给重叠文字加发光描边 */
+        .scheme-2 .photo-stack {
+            /* 让照片边缘自然溶解进背景 */
+            -webkit-mask-image: linear-gradient(225deg, black 40%, transparent 80%);
+            mask-image: linear-gradient(225deg, black 40%, transparent 80%);
+        }
+
+        .scheme-2 .poetic {
+            /* 利用米白色发光保护文字在混排时清晰可见 */
+            text-shadow:
+                0 0 10px #fdfcf6,
+                0 0 10px #fdfcf6,
+                2px 2px 15px #fdfcf6,
+                -2px -2px 15px #fdfcf6;
+        }
+
+        .scheme-2 .time-row {
+            text-shadow: 0 0 8px #fdfcf6, 0 0 12px #fdfcf6;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div>
+        <div class="demo-title">方案一：空间规避 (严格控制文字宽度)</div>
+        <p style="text-align: center; color: #777; font-size: 13px; margin-bottom: 20px;">文字到达图片边缘前自动换行，图文分区清晰，互不干扰。</p>
+        <div class="card scheme-1">
+            <div class="photo-stack">
+                <div class="photo-under"></div>
+                <div class="photo-top">
+                    <img src="https://images.unsplash.com/photo-1517816743773-6e0fd5ce946c?auto=format&fit=crop&w=400&q=80"
+                        alt="demo">
+                    <div class="photo-glass"></div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="time-row">
+                    <span>14:30</span>
+                    <span>· 午后的思考</span>
+                </div>
+                <!-- 这里的文字会在到达图片边缘前折行 -->
+                <div class="poetic">
+                    哪怕只有片刻的停歇，光影斑驳，也值得被温柔珍藏在这个瞬息万变的世界里。
+                </div>
+                <div class="original-record">
+                    "今天中午真的一点都不饿，因为早上一直坐在电脑前用 AI coding，所以中午也没有点外卖，省了一顿饭钱"
+                </div>
+                <div style="font-size: 13px; color: #777; text-align: right; margin-top: 8px; font-weight: 500;">
+                    —— 你做得很棒
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="demo-title">方案二：羽化溶解 (边缘渐变 + 文字光晕)</div>
+        <p style="text-align: center; color: #777; font-size: 13px; margin-bottom: 20px;">
+            保留图片大小，但让图片左下边缘融进背景纸张，并通过给文字添加多重米色发光阴影确保重叠时依然可读。</p>
+        <div class="card scheme-2">
+            <div class="photo-stack">
+                <div class="photo-under"></div>
+                <div class="photo-top">
+                    <img src="https://images.unsplash.com/photo-1517816743773-6e0fd5ce946c?auto=format&fit=crop&w=400&q=80"
+                        alt="demo">
+                    <div class="photo-glass"></div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="time-row">
+                    <span>14:30</span>
+                    <span>· 午后的思考</span>
+                </div>
+                <!-- 这里的文字会跨过图片，但图片边缘有一层溶解渐变，文字底部也自带发光层 -->
+                <div class="poetic" style="padding-right: 60px;">
+                    哪怕只有片刻的停歇，光影斑驳，也值得被温柔珍藏在这个瞬息万变的世界里，让这段记忆成为今天的锚点。
+                </div>
+                <div class="original-record" style="margin-right: 40px; position:relative; z-index: 2;">
+                    "今天中午真的一点都不饿，因为早上一直坐在电脑前用 AI coding，所以中午也没有点外卖，省了一顿饭钱"
+                </div>
+                <div style="font-size: 13px; color: #777; text-align: right; margin-top: 8px; font-weight: 500;">
+                    —— 你做得很棒
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

@@ -5,7 +5,8 @@ import { TimelineCard } from './TimelineCard';
 
 interface MomentStreamProps {
     threads: EventThread[];
-    onDelete?: (threadId: string) => void;
+    onDelete?: (threadId: string, thread: EventThread) => void;
+    isSearchMode?: boolean;
 }
 
 export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete }) => {
@@ -47,7 +48,7 @@ export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete })
                             <TimelineCard
                                 thread={thread}
                                 index={index}
-                                onDelete={() => onDelete?.(thread.id)}
+                                onDelete={() => onDelete?.(thread.id, thread)}
                             />
                         </div>
                     ))}

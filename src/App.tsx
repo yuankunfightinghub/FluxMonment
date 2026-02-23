@@ -7,11 +7,12 @@ import { InputCapsule, type PendingMedia } from './components/InputCapsule';
 import { MomentStream } from './components/MomentStream';
 import { ViewTabs, type TabValue } from './components/ViewTabs';
 import { DailyMemory } from './components/DailyMemory';
-import { processAndAggregateInput, predictTopicTheme } from './utils/classificationEngine';
+import { processAndAggregateInput, predictTopicTheme, detectUserIntent, generateEmbedding, performSemanticSearch } from './utils/classificationEngine';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { uploadMedia } from './lib/storage';
 import { isSameDay } from 'date-fns';
-import type { EventCategory, MediaAttachment } from './types';
+import type { EventCategory, MediaAttachment, EventThread } from './types';
+import { Search, X } from 'lucide-react';
 
 function App() {
   const { threads, user, isAuthChecked, signInWithGoogle, signOut, addMoment, deleteMoment, clearAllMoments } = useFirestoreSync();
@@ -23,6 +24,9 @@ function App() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabValue>('moments');
+  const [searchResults, setSearchResults] = useState<{ thread: EventThread; similarity: number }[]>([]);
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // ── Media state ────────────────────────────────────────────────────────────
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
@@ -34,10 +38,36 @@ function App() {
       await clearAllMoments();
       console.log("Database cleared! Happy testing. ✨");
     };
+
+    (window as any).backfillEmbeddings = async () => {
+      console.log("开始历史数据向量化（Backfill Embedding）...");
+      const updated = [...threads];
+      let i = 0;
+      for (const thread of updated) {
+        if (!thread.embedding || thread.embedding.length === 0) {
+          console.log(`正在为卡片 [${thread.title}] 生成向量...`);
+          const fullText = thread.entries.map(e => e.content).join('\n');
+          const emb = await generateEmbedding(fullText);
+          if (emb.length > 0) {
+            thread.embedding = emb;
+            i++;
+          }
+        }
+      }
+      if (i > 0) {
+        console.log(`生成完毕，共新增 ${i} 条向量记录，正在写回 Firestore...`);
+        await addMoment(updated);
+        console.log("写回完成！");
+      } else {
+        console.log("所有的卡片都已经有向量，无需回填。");
+      }
+    };
+
     return () => {
       delete (window as any).clearTestData;
+      delete (window as any).backfillEmbeddings;
     };
-  }, [clearAllMoments]);
+  }, [clearAllMoments, addMoment, threads]);
 
   useEffect(() => {
     if (inputValue.trim()) {
@@ -110,6 +140,30 @@ function App() {
     ));
 
     try {
+      // 1. 意图极速推断 (SEARCH vs RECORD)
+      const intentAnalysis = await detectUserIntent(content);
+
+      if (intentAnalysis.intent === 'SEARCH') {
+        // --- 拦截并执行语义搜索 ---
+        const query = intentAnalysis.query || content;
+        console.log(`🎯 命中搜索意图！AI 改写后的语义描述为: ${query}`);
+        setSearchQuery(query);
+
+        const queryEmb = await generateEmbedding(query);
+        if (queryEmb.length > 0) {
+          const matches = await performSemanticSearch(queryEmb, threads, 0.45);
+          setSearchResults(matches);
+          setIsSearchMode(true);
+          setActiveTab('moments'); // 强制切回 moments 流以显示结果
+        } else {
+          alert("向量生成失败，请检查网络或配置。");
+        }
+
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2. 如果不是搜索，继续跑生成卡片的流程 (RECORD)
       const { updatedThreads, highlightThreadId } = await processAndAggregateInput(
         content,
         threads,
@@ -281,11 +335,95 @@ function App() {
               登录后你的瞬间将跨设备同步 ☁️
             </p>
           </div>
+        ) : isSearchMode ? (
+          <div style={{ padding: '0 20px' }}>
+            {/* Search Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              width: '100%',
+              maxWidth: '800px',
+              margin: '0 auto 24px auto',
+              padding: '16px 20px',
+              background: 'rgba(var(--color-primary-rgb), 0.05)',
+              borderRadius: '12px',
+              border: '1px solid rgba(var(--color-primary-rgb), 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'var(--color-primary)', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', color: 'white',
+                  flexShrink: 0
+                }}>
+                  <Search size={18} />
+                </div>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: 'var(--text-strong)',
+                    display: 'flex',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden'
+                  }}>
+                    <span>“</span>
+                    <span style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '300px'
+                    }}>
+                      {searchQuery}
+                    </span>
+                    <span>” 的检索结果</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    找到 {searchResults.length} 条相关记忆
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSearchMode(false);
+                  setSearchResults([]);
+                  setInputValue('');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-default)',
+                  background: 'white',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--text-default)'
+                }}
+              >
+                <X size={14} /> 退出搜索
+              </button>
+            </div>
+
+            <MomentStream
+              threads={searchResults.map(r => r.thread)}
+              onDelete={deleteMoment}
+              isSearchMode={true}
+            />
+
+            {searchResults.length === 0 && (
+              <div style={{
+                textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)',
+                fontSize: '14px'
+              }}>
+                没有搜到相关记忆，换个说法试试？
+              </div>
+            )}
+          </div>
         ) : activeTab === 'moments' ? (
-          <MomentStream threads={threads} onDelete={async (id) => {
-            const t = threads.find(x => x.id === id);
-            if (t) await deleteMoment(id, t);
-          }} />
+          <MomentStream threads={threads} onDelete={deleteMoment} />
         ) : (
           <DailyMemory todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, new Date()))} />
         )}

@@ -1,10 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2 } from 'lucide-react';
-import Zoom from 'react-medium-image-zoom';
-import 'react-medium-image-zoom/dist/styles.css';
 import type { EventThread } from '../types';
 import MomentAvatar from './MomentAvatar';
+import { MediaMosaic } from './MediaMosaic';
 
 interface TimelineCardProps {
     thread: EventThread;
@@ -196,70 +195,10 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                                         </span>
                                     )}
 
-                                    {/* Media grid */}
-                                    {entry.attachments && entry.attachments.length > 0 && (() => {
-                                        const visibleMedia = entry.attachments.slice(0, 4);
-                                        const overflow = entry.attachments.length - 4;
-                                        return (
-                                            <div style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: visibleMedia.length === 1
-                                                    ? '1fr'
-                                                    : 'repeat(2, 1fr)',
-                                                gap: '4px',
-                                                marginTop: '6px',
-                                                borderRadius: '6px',
-                                                overflow: 'hidden',
-                                            }}>
-                                                {visibleMedia.map((att, mi) => (
-                                                    <div key={mi} style={{
-                                                        position: 'relative',
-                                                        aspectRatio: visibleMedia.length === 1 ? '16/9' : '1/1',
-                                                        borderRadius: '5px',
-                                                        overflow: 'hidden',
-                                                        background: 'var(--bg-surface)',
-                                                    }}>
-                                                        {att.type === 'image' ? (
-                                                            <div style={{ width: '100%', height: '100%', cursor: 'zoom-in' }} onClick={(e) => e.stopPropagation()}>
-                                                                <Zoom zoomMargin={40}>
-                                                                    <img
-                                                                        src={att.url}
-                                                                        alt={att.name}
-                                                                        style={{
-                                                                            width: '100%', height: '100%',
-                                                                            objectFit: 'cover', display: 'block',
-                                                                        }}
-                                                                    />
-                                                                </Zoom>
-                                                            </div>
-                                                        ) : (
-                                                            <video
-                                                                src={att.url}
-                                                                controls
-                                                                preload="metadata"
-                                                                style={{
-                                                                    width: '100%', height: '100%',
-                                                                    objectFit: 'cover', display: 'block',
-                                                                }}
-                                                            />
-                                                        )}
-                                                        {/* Overflow badge on last visible item */}
-                                                        {overflow > 0 && mi === 3 && (
-                                                            <div style={{
-                                                                position: 'absolute', inset: 0,
-                                                                background: 'rgba(0,0,0,0.5)',
-                                                                display: 'flex', alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                color: '#fff', fontSize: '16px', fontWeight: 600,
-                                                            }}>
-                                                                +{overflow}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
+                                    {/* Media Mosaic — Stacked & Expandable */}
+                                    {entry.attachments && entry.attachments.length > 0 && (
+                                        <MediaMosaic attachments={entry.attachments} />
+                                    )}
                                 </div>
 
                             </motion.div>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline Layout Demo</title>
+    <style>
+        body {
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+            background: #f6f5f4;
+            margin: 0;
+            padding: 40px;
+            color: #050505;
+        }
+
+        .layout-container {
+            display: flex;
+            gap: 60px;
+            max-width: 1100px;
+            margin: 0 auto;
+            justify-content: center;
+        }
+
+        /* 左侧：今日核心记忆区域 */
+        .left-panel {
+            flex: 1;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .fake-header {
+            font-size: 84px;
+            font-weight: 600;
+            line-height: 1;
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+
+        .fake-card {
+            background: #fdfcf6;
+            border: 1px solid rgba(230, 150, 80, 0.5);
+            border-radius: 16px;
+            padding: 24px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            box-shadow: inset 0 0 40px rgba(220, 180, 140, 0.1), 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
+
+        /* 右侧：纵向流光时间轴 */
+        .right-panel {
+            width: 320px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 40px;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 40px;
+        }
+
+        .right-panel::-webkit-scrollbar {
+            display: none;
+        }
+
+        .timeline-title {
+            font-size: 12px;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 24px;
+        }
+
+        .timeline-container {
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .timeline-container::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            bottom: -50px;
+            left: 5px;
+            width: 1px;
+            background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.1) 10%, rgba(0, 0, 0, 0.1) 90%, transparent);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 32px;
+            padding-left: 16px;
+        }
+
+        /* 节点圆点规范：工作为黑，生活为橙 */
+        .timeline-dot {
+            position: absolute;
+            left: -20px;
+            top: 4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #050505;
+            /* 工作：黑色 */
+            box-shadow: 0 0 0 4px #f6f5f4;
+            z-index: 1;
+            transition: transform 0.3s;
+        }
+
+        .timeline-dot.life {
+            background: #d35400;
+            /* 生活：橙色 */
+        }
+
+        /* Hover时圆点放大联动 */
+        .timeline-item:hover .timeline-dot {
+            transform: scale(1.2);
+        }
+
+        /* 卡片整体 */
+        .item-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+            padding: 12px 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+            transition: all 0.3s ease;
+            cursor: default;
+            overflow: hidden;
+        }
+
+        /* 悬停态样式：展示完整结构 */
+        .item-card:hover {
+            transform: translateX(4px);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        }
+
+        /* 顶部基础信息 (缩略图与标题) */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .card-header-text {
+            flex: 1;
+        }
+
+        .item-time {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        /* 时间文字保持颜色对应 */
+        .item-time.work-color {
+            color: #050505;
+        }
+
+        .item-time.life-color {
+            color: #d35400;
+        }
+
+        .item-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #050505;
+            line-height: 1.3;
+        }
+
+        /* 有图片时的缩略图 */
+        .thumbnail {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+            margin-left: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: opacity 0.3s ease;
+        }
+
+        /* 隐藏的详细结构 (Hover展开) */
+        .card-details {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+            transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+        }
+
+        .item-card:hover .card-details {
+            max-height: 300px;
+            opacity: 1;
+            margin-top: 12px;
+        }
+
+        /* 展开的时候可以将右上角小缩略图淡化，因为大图展开了 */
+        .item-card:hover .thumbnail {
+            opacity: 0.2;
+        }
+
+        .item-desc {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .full-image {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="layout-container">
+        <!-- 左侧模拟主体内容 -->
+        <div class="left-panel">
+            <div class="fake-header">22 <span
+                    style="font-size: 13px; font-weight: 600; font-style: italic; color: #777; letter-spacing: 0.15em; text-transform: uppercase;">Feb
+                    2026</span></div>
+            <div style="font-size: 16px; font-style: italic; font-weight: 500;">"那些不被察觉的光影，皆是流动的诗..."</div>
+            <div class="fake-card">
+                深度记忆卡片 (Part 2)
+            </div>
+        </div>
+
+        <!-- 右侧纵向时间轴 -->
+        <div class="right-panel">
+            <div class="timeline-title">流光时间轴 / Fluid Chronos</div>
+
+            <div class="timeline-container">
+
+                <!-- Timeline Item 1 (Work) -> 无图模式 -->
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div> <!-- 默认工作黑 -->
+                    <div class="item-card">
+                        <div class="card-header">
+                            <div class="card-header-text">
+                                <div class="item-time work-color">09:30</div>
+                                <div class="item-title">早间项目排期</div>
+                            </div>
+                        </div>
+                        <!-- Hover 展开正文 -->
+                        <div class="card-details">
+                            <div class="item-desc">梳理了本周的核心任务节点，喝了一杯冰咖啡开始写代码。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 2 (Life) -> 带图模式 -->
+                <div class="timeline-item">
+                    <div class="timeline-dot life"></div> <!-- 生活橙 -->
+                    <div class="item-card">
+                        <div class="card-header">
+                            <div class="card-header-text">
+                                <div class="item-time life-color">12:15</div>
+                                <div class="item-title">简餐与留白</div>
+                            </div>
+                            <!-- 常驻的小缩略图 -->
+                            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=100&q=80"
+                                class="thumbnail" alt="thumb">
+                        </div>
+                        <!-- Hover 展开正文与大图 -->
+                        <div class="card-details">
+                            <div class="item-desc">中午真的一点都不饿，省了一顿点外卖的钱，顺带发了个呆，感觉很放松。</div>
+                            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80"
+                                class="full-image" alt="full">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 3 (Work) -> 无图模式 -->
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="item-card">
+                        <div class="card-header">
+                            <div class="card-header-text">
+                                <div class="item-time work-color">15:45</div>
+                                <div class="item-title">技术难点重构</div>
+                            </div>
+                        </div>
+                        <div class="card-details">
+                            <div class="item-desc">重构了卡片渲染逻辑，解决了照片和文字互相遮挡的识别问题，代码整洁多了。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 4 (Life) -> 带图模式 -->
+                <div class="timeline-item">
+                    <div class="timeline-dot life"></div>
+                    <div class="item-card">
+                        <div class="card-header">
+                            <div class="card-header-text">
+                                <div class="item-time life-color">19:20</div>
+                                <div class="item-title">长岛晚间散步</div>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1517816743773-6e0fd5ce946c?auto=format&fit=crop&w=100&q=80"
+                                class="thumbnail" alt="thumb">
+                        </div>
+                        <div class="card-details">
+                            <div class="item-desc">初春微雨的长岛街头，空气很清冷，耳机里放着轻音乐，这是一段极度舒适的独处。</div>
+                            <img src="https://images.unsplash.com/photo-1517816743773-6e0fd5ce946c?auto=format&fit=crop&w=400&q=80"
+                                class="full-image" alt="full">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
