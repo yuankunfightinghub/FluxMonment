@@ -324,7 +324,7 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                             // Skeleton for Deep Memory Card
                             <div style={{
                                 position: 'relative',
-                                background: '#fdfcf6',
+                                background: '#FFFFFF',
                                 border: '1px solid rgba(230, 150, 80, 0.3)',
                                 borderRadius: '16px',
                                 padding: '24px',
@@ -360,7 +360,7 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                                 data.deepMemories.slice(0, 1).map((mem) => (
                                     <div key={mem.id} style={{
                                         position: 'relative',
-                                        background: '#fdfcf6', // Always use beige base
+                                        background: '#FFFFFF', // 统一为纯白色
                                         border: '1px solid rgba(230, 150, 80, 0.5)',
                                         borderRadius: '16px',
                                         padding: '24px',
@@ -387,7 +387,7 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                                                     borderRadius: '16px',
                                                     border: '1px solid rgba(255, 255, 255, 0.6)',
                                                     boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                                                    background: 'rgba(253, 252, 246, 0.95)', // Solid beige mimicking another card
+                                                    background: 'rgba(255, 255, 255, 0.95)', // 还原为纯白
                                                     zIndex: 0,
                                                 }} />
 
@@ -412,7 +412,7 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                                                     {/* Reduced blur frosted glass overlay directly on the photo */}
                                                     <div style={{
                                                         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                                                        background: 'rgba(253, 252, 246, 0.25)', // Very light beige tint allowing original color check
+                                                        background: 'rgba(255, 255, 255, 0.25)', // 还原为纯白
                                                         backdropFilter: 'blur(3px) saturate(130%)',
                                                         WebkitBackdropFilter: 'blur(3px) saturate(130%)',
                                                         pointerEvents: 'none',
@@ -451,7 +451,7 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                                             </div>
 
                                             {/* Poetic Interpretation */}
-                                            <div style={{ fontSize: '18px', color: 'var(--text-strong)', lineHeight: 1.6, fontWeight: 500 }}>
+                                            <div style={{ fontSize: '18px', color: 'var(--text-strong)', lineHeight: 1.6, fontWeight: 500, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                                                 {mem.poeticInterpretation}
                                             </div>
 
@@ -464,7 +464,9 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                                                 borderLeft: '2px solid var(--border-default)',
                                                 background: mem.bgMediaUrl ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.03)',
                                                 padding: '10px 12px',
-                                                borderRadius: '0 8px 8px 0'
+                                                borderRadius: '0 8px 8px 0',
+                                                overflowWrap: 'anywhere',
+                                                wordBreak: 'break-word'
                                             }}>
                                                 "{mem.originalRecord}"
                                             </div>

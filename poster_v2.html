@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FluxMoment Poster V2 - 深度记忆、灵魂与洞察</title>
+    <style>
+        :root {
+            --notion-black: #050505;
+            --notion-gray: #37352f;
+            --notion-bg: #FAFAF9;
+            --notion-border: rgba(26, 26, 26, 0.08);
+            --accent-blue: #006ebc;
+            --accent-orange: #e87533;
+            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+            --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            --gradient-blue: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            --gradient-orange: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+            --gradient-purple: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+            --gradient-yellow: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+        }
+
+        body {
+            margin: 0;
+            padding: 40px;
+            background-color: #F1F1F0;
+            font-family: var(--font-body);
+            display: flex;
+            justify-content: center;
+        }
+
+        .poster-canvas {
+            width: 960px;
+            background-color: var(--notion-bg);
+            padding: 80px;
+            box-shadow: 0 40px 120px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* ── Header ── */
+        .hero-section {
+            margin-bottom: 100px;
+            position: relative;
+        }
+
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .logo-m {
+            width: 48px;
+            height: 48px;
+            background: var(--notion-black);
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 80 L50 20 L80 80' fill='none' stroke='black' stroke-width='12' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 80 L50 20 L80 80' fill='none' stroke='black' stroke-width='12' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+        }
+
+        .logo-name {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .main-slogan {
+            font-size: 64px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -2px;
+            margin-bottom: 24px;
+            font-style: italic;
+        }
+
+        .hero-tagline {
+            font-size: 20px;
+            color: var(--notion-gray);
+            font-weight: 400;
+            opacity: 0.7;
+        }
+
+        /* ── Value Section 1 ── */
+        .section {
+            margin-bottom: 100px;
+        }
+
+        .section-header {
+            margin-bottom: 40px;
+        }
+
+        .section-tag {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .section-title {
+            font-size: 36px;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -1px;
+        }
+
+        .section-slogan {
+            font-size: 18px;
+            color: var(--notion-gray);
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+
+        /* Inspiration Cards (Value 1) */
+        .card-row {
+            display: flex;
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .inspire-card {
+            flex: 1;
+            height: 380px;
+            border-radius: 24px;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: var(--notion-black);
+            box-shadow: var(--card-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-glow {
+            position: absolute;
+            top: -20%;
+            right: -20%;
+            width: 60%;
+            height: 60%;
+            background: rgba(255, 255, 255, 0.3);
+            filter: blur(40px);
+            border-radius: 50%;
+        }
+
+        .inspire-card h4 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 16px 0;
+            line-height: 1.2;
+        }
+
+        .inspire-card p {
+            font-size: 16px;
+            line-height: 1.5;
+            opacity: 0.8;
+            margin: 0;
+        }
+
+        .card-footer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .mini-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        /* ── Value Section 3 (Insight) ── */
+        .dashboard-mockup {
+            background: #fff;
+            border: 1px solid var(--notion-border);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: var(--card-shadow);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .stat-group h5 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        /* Mood Chart Mockup */
+        .mood-chart {
+            width: 100%;
+            height: 120px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .mood-path {
+            fill: none;
+            stroke: var(--accent-orange);
+            stroke-width: 3;
+            stroke-linecap: round;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--notion-border);
+            border-radius: 4px;
+        }
+
+        .checkbox.checked {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            position: relative;
+        }
+
+        .checkbox.checked::after {
+            content: "✓";
+            color: white;
+            position: absolute;
+            top: -2px;
+            left: 3px;
+            font-size: 12px;
+        }
+
+        .todo-item.done {
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
+
+        /* Vlog Card */
+        .vlog-preview {
+            width: 100%;
+            height: 200px;
+            background: #eee;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            background-image: url('https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80');
+            background-size: cover;
+        }
+
+        .vlog-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            color: white;
+        }
+
+        /* ── Scatter Icons ── */
+        .m-icon-scatter {
+            position: absolute;
+            font-size: 24px;
+            z-index: 0;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Avatar Lab at Bottom */
+        .lab-footer {
+            margin-top: 100px;
+            text-align: center;
+            border-top: 1px solid var(--notion-border);
+            padding-top: 60px;
+        }
+
+        .lab-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 16px;
+            margin-top: 40px;
+        }
+
+        .lab-item {
+            aspect-ratio: 1;
+            background: #fff;
+            border: 1px solid var(--notion-border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .lab-item:hover {
+            transform: translateY(-5px) rotate(5deg);
+            border-color: var(--accent-blue);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="poster-canvas">
+        <!-- Scatter Icons from Spec -->
+        <div class="m-icon-scatter" style="top: 10%; left: 80%;">🎧</div>
+        <div class="m-icon-scatter" style="top: 25%; left: 5%;">🚀</div>
+        <div class="m-icon-scatter" style="top: 45%; left: 90%;">💡</div>
+        <div class="m-icon-scatter" style="top: 70%; left: 2%;">🧘</div>
+        <div class="m-icon-scatter" style="top: 85%; left: 85%;">⌚</div>
+
+        <header class="hero-section">
+            <div class="logo-box">
+                <div class="logo-m"></div>
+                <div class="logo-name">FluxMoment</div>
+            </div>
+            <h1 class="main-slogan">那些不被察觉的光影，<br>皆是流动的诗。</h1>
+            <p class="hero-tagline">采样级碎片信息捕捉工具 · 你的数字意识容器</p>
+        </header>
+
+        <!-- Section 1: 告别整理 -->
+        <section class="section">
+            <div class="section-header">
+                <span class="section-tag">VALUE 01</span>
+                <h2 class="section-title">1. 告别整理，专注于思考</h2>
+                <div class="section-slogan">记得下、分得清、搜得到</div>
+            </div>
+
+            <div class="card-row">
+                <!-- Card 1: Work -->
+                <div class="inspire-card" style="background: var(--gradient-blue);">
+                    <div class="card-glow"></div>
+                    <div>
+                        <h4>新一代登录页<br>逻辑重构</h4>
+                        <p>主要解决三点核心痛点：性能瓶颈优化、品牌视觉一致性同步、以及极致的响应式适配方案。</p>
+                    </div>
+                    <div class="card-footer">
+                        <div class="mini-avatar">🎯</div>
+                        <span>AI 智能识别：产品与方案</span>
+                    </div>
+                </div>
+
+                <!-- Card 2: Life -->
+                <div class="inspire-card" style="background: var(--gradient-orange);">
+                    <div class="card-glow"></div>
+                    <div>
+                        <h4>春日湖边<br>家庭骑行</h4>
+                        <p>三月的风真的好软。带孩子在湖边骑了 5 公里，他第一次不用辅助轮了，那一刻我们都好激动。</p>
+                    </div>
+                    <div class="card-footer">
+                        <div class="mini-avatar">🚲</div>
+                        <span>AI 智能识别：亲子生活</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: 深度记忆与洞察 -->
+        <section class="section">
+            <div class="section-header">
+                <span class="section-tag">VALUE 03</span>
+                <h2 class="section-title">3. 深度记忆、灵魂与洞察</h2>
+                <div class="section-slogan">从碎片到结晶，让时间为你工作</div>
+            </div>
+
+            <div class="dashboard-mockup">
+                <!-- Left: Summary & Tasks -->
+                <div>
+                    <div class="stat-group">
+                        <h5>今日总结 / Daily Digest</h5>
+                        <p style="font-size: 16px; line-height: 1.6; color: var(--notion-gray);">
+                            "今日关键词：**平衡、进取**。你在上午完成了核心逻辑优化，傍晚回归家庭，在自然中获得了高质量的留白。"
+                        </p>
+                    </div>
+                    <div class="stat-group" style="margin-top: 32px;">
+                        <h5>关键待办 / Key Tasks</h5>
+                        <div class="todo-item done">
+                            <div class="checkbox checked"></div>
+                            <span>完成登录页逻辑重构</span>
+                        </div>
+                        <div class="todo-item done">
+                            <div class="checkbox checked"></div>
+                            <span>湖边骑行照片导出备份</span>
+                        </div>
+                        <div class="todo-item">
+                            <div class="checkbox"></div>
+                            <span>准备下周一全员早会材料</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Mood & Vlog -->
+                <div>
+                    <div class="stat-group">
+                        <h5>情绪曲线 / Mood Curve</h5>
+                        <div class="mood-chart">
+                            <svg width="100%" height="80" viewBox="0 0 400 100">
+                                <path class="mood-path" d="M10,80 C50,20 120,40 180,60 C240,80 320,10 390,40" />
+                                <circle cx="390" cy="40" r="5" fill="var(--accent-orange)" />
+                            </svg>
+                            <div
+                                style="display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 10px;">
+                                <span>MORNING (Focused)</span>
+                                <span>EVENING (Happy)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-group" style="margin-top: 32px;">
+                        <h5>一天 Vlog / Story Highlights</h5>
+                        <div class="vlog-preview">
+                            <div class="vlog-overlay">
+                                <div style="font-size: 12px; font-weight: 700; opacity: 0.8; margin-bottom: 4px;">
+                                    2026.02.24</div>
+                                <div style="font-size: 16px; font-weight: 800;">“在代码与自然间穿梭”</div>
+                            </div>
+                            <div style="position: absolute; top: 10px; right: 10px; font-size: 24px;">🎧</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                style="margin-top: 32px; padding: 24px; background: white; border: 1px solid var(--notion-border); border-radius: 12px; box-shadow: var(--card-shadow);">
+                <span
+                    style="font-size: 12px; font-weight: 700; color: var(--accent-blue); display: block; margin-bottom: 8px;">AI
+                    最佳实践心得 / Best Practice</span>
+                <p style="margin: 0; font-size: 14px; color: var(--notion-gray); line-height: 1.5;">
+                    "利用向量化存储（Vector Embedding）处理日常碎片，能实现 0.45 阈值下的精准模糊搜索。这意味着即使你不记得具体的文字，只要记得那一刻的『意图』，记忆就能被瞬间召回。"
+                </p>
+            </div>
+        </section>
+
+        <!-- Icon Lab at Bottom -->
+        <footer class="lab-footer">
+            <h2 class="section-title" style="justify-content: center;">心情实验室 / 50+ Avatar Variants</h2>
+            <div class="section-slogan">根据你的表达，实时变换的 50 种数字化灵魂</div>
+            <div class="lab-grid">
+                <!-- 50 Placeholder Icons -->
+                <div class="lab-item">🎧</div>
+                <div class="lab-item">🎨</div>
+                <div class="lab-item">⏳</div>
+                <div class="lab-item">🧘</div>
+                <div class="lab-item">🚀</div>
+                <div class="lab-item">💡</div>
+                <div class="lab-item">🌈</div>
+                <div class="lab-item">📷</div>
+                <div class="lab-item">🎤</div>
+                <div class="lab-item">🔋</div>
+                <div class="lab-item">🧠</div>
+                <div class="lab-item">🎯</div>
+                <div class="lab-item">🧬</div>
+                <div class="lab-item">🎮</div>
+                <div class="lab-item">🍜</div>
+                <div class="lab-item">☕</div>
+                <div class="lab-item">⌚</div>
+                <div class="lab-item">🌙</div>
+                <div class="lab-item">📚</div>
+                <div class="lab-item">🏖️</div>
+                <div class="lab-item">💎</div>
+                <div class="lab-item">🕶️</div>
+                <div class="lab-item">🎩</div>
+                <div class="lab-item">🎈</div>
+                <div class="lab-item">🧸</div>
+                <div class="lab-item">🍀</div>
+                <div class="lab-item">🥑</div>
+                <div class="lab-item">🍦</div>
+                <div class="lab-item">🥊</div>
+                <div class="lab-item">🎸</div>
+                <div class="lab-item">🛹</div>
+                <div class="lab-item">🚲</div>
+                <div class="lab-item">🚆</div>
+                <div class="lab-item">🛸</div>
+                <div class="lab-item">🏰</div>
+                <div class="lab-item">🎡</div>
+                <div class="lab-item">🌋</div>
+                <div class="lab-item">🌵</div>
+                <div class="lab-item">🍄</div>
+                <div class="lab-item">🌻</div>
+                <div class="lab-item">🐳</div>
+                <div class="lab-item">🦉</div>
+                <div class="lab-item">🦊</div>
+                <div class="lab-item">🦁</div>
+                <div class="lab-item">🐼</div>
+                <div class="lab-item">🐨</div>
+                <div class="lab-item">🦄</div>
+                <div class="lab-item">🐉</div>
+            </div>
+        </footer>
+
+        <div style="margin-top: 80px; text-align: center; font-size: 12px; color: #ccc;">
+            © 2026 FluxMoment | All Moments Worth Keeping
+        </div>
+    </div>
+
+</body>
+
+</html>

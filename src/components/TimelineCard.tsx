@@ -190,6 +190,8 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                                             color: 'var(--text-default)',
                                             letterSpacing: '-0.01em',
                                             fontFamily: 'var(--font-body)',
+                                            overflowWrap: 'anywhere',
+                                            wordBreak: 'break-word',
                                         }}>
                                             {entry.content}
                                         </span>

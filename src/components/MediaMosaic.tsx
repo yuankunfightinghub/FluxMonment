@@ -139,7 +139,7 @@ export const MediaMosaic: React.FC<MediaMosaicProps> = ({ attachments, forceExpa
                                 exit={{ opacity: 0, scale: 0.9 }}
                                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                                 style={{
-                                    aspectRatio: (!shouldExpand && count === 1) ? '16/10' : '1/1',
+                                    aspectRatio: (count === 1) ? '16/10' : '1/1',
                                     width: '100%',
                                 }}
                             >

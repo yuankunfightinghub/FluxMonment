@@ -102,7 +102,7 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
     const hasContent = value.trim() || pendingMedia.length > 0;
 
     const submitBg = hasContent
-        ? (category === 'cyber-blue' ? 'var(--color-primary)' : category === 'sunset-orange' ? '#e87533' : 'var(--color-primary)')
+        ? (category === 'cyber-blue' ? '#000000' : category === 'sunset-orange' ? '#e87533' : '#000000')
         : 'var(--bg-surface)';
     const submitColor = hasContent ? '#ffffff' : 'var(--text-muted)';
 
@@ -314,9 +314,12 @@ const LoadingDots: React.FC = () => (
         {[0, 1, 2].map(i => (
             <motion.div
                 key={i}
-                animate={{ opacity: [0.3, 1, 0.3] }}
-                transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
-                style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor' }}
+                animate={{
+                    opacity: [0.3, 1, 0.3],
+                    y: [0, -3, 0]
+                }}
+                transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }}
+                style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'currentColor' }}
             />
         ))}
     </div>

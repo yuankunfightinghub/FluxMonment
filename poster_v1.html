@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FluxMoment Poster - 流光瞬间</title>
+    <style>
+        :root {
+            --notion-black: #050505;
+            --notion-gray: #37352f;
+            --notion-single-gray: #7a7a7a;
+            --notion-bg: #FAFAF9;
+            --notion-border: rgba(26, 26, 26, 0.08);
+            --accent-blue: #006ebc;
+            --accent-orange: #e87533;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.04);
+        }
+
+        @font-face {
+            font-family: 'NotionInter';
+            src: local('Inter'), local('-apple-system');
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #F1F0EF;
+            font-family: 'NotionInter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--notion-black);
+        }
+
+        .poster-canvas {
+            width: 800px;
+            background-color: var(--notion-bg);
+            padding: 80px;
+            box-shadow: 0 40px 120px rgba(0, 0, 0, 0.08);
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+        }
+
+        /* 背景微光装饰 */
+        .poster-canvas::before {
+            content: "FluxMoment";
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            font-size: 180px;
+            font-weight: 800;
+            color: rgba(0, 0, 0, 0.015);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        header {
+            margin-bottom: 80px;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: var(--notion-black);
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 80 L50 20 L80 80' fill='none' stroke='black' stroke-width='12' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 80 L50 20 L80 80' fill='none' stroke='black' stroke-width='12' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.8px;
+        }
+
+        .slogan-hero {
+            font-size: 54px;
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: -1.5px;
+            font-style: italic;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: var(--notion-single-gray);
+            margin-top: 16px;
+            font-weight: 400;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: #999;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--notion-border);
+        }
+
+        .value-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-top: 60px;
+        }
+
+        .value-card {
+            border: 1px solid var(--notion-border);
+            border-radius: 14px;
+            padding: 28px;
+            background: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .value-card h3 {
+            margin: 0 0 12px 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .value-card p {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--notion-gray);
+        }
+
+        /* 50 个头像展示区 */
+        .avatar-lab-container {
+            margin-top: 80px;
+        }
+
+        .avatar-wall {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 12px;
+        }
+
+        .avatar-token {
+            aspect-ratio: 1;
+            background: #fdfcfb;
+            border: 1px solid var(--notion-border);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .avatar-token:hover {
+            transform: translateY(-4px) scale(1.05);
+            border-color: var(--accent-blue);
+            box-shadow: 0 12px 30px rgba(0, 110, 188, 0.1);
+        }
+
+        /* 场景模拟 */
+        .scenario-demo {
+            margin-top: 24px;
+            padding: 16px;
+            background: #f9f9f8;
+            border-radius: 8px;
+            border: 1px dashed var(--notion-border);
+        }
+
+        .scenario-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--notion-gray);
+        }
+
+        .scenario-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        footer {
+            margin-top: 100px;
+            text-align: center;
+            border-top: 1px solid var(--notion-border);
+            padding-top: 40px;
+        }
+
+        .footer-tagline {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--notion-black);
+        }
+
+        .footer-sub {
+            font-size: 13px;
+            color: #ccc;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="poster-canvas">
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <div class="logo-text">FluxMoment</div>
+            </div>
+            <div class="slogan-hero">
+                那些不被察觉的光影，<br>
+                皆是流动的诗。
+            </div>
+            <div class="subtitle">采样级个人碎片记忆引擎 · 为有情感的灵魂而生</div>
+        </header>
+
+        <div class="section-title">核心价值 / Core Values</div>
+        <div class="value-grid">
+            <div class="value-card">
+                <h3 style="color: var(--accent-blue);">01. 告别整理，直达本质</h3>
+                <p>AI 自动识别意图：无论是工作灵感还是生活琐事，按下回车即完成分类。支持全语境检索，哪怕只记得一个模糊的念头也能精准找回。</p>
+                <div class="scenario-demo">
+                    <div class="scenario-item"><span class="scenario-dot"
+                            style="background: var(--accent-blue);"></span> 搜：“上次开会聊的商业逻辑”</div>
+                </div>
+            </div>
+            <div class="value-card">
+                <h3 style="color: var(--accent-orange);">02. 让记忆拥有心跳</h3>
+                <p>MomentAvatar 不仅仅是头像。它随你的情绪实时变换神态。50+ 种独家变体与装饰配件，让每一条碎片都承载着文字之外的温度。</p>
+                <div class="scenario-demo">
+                    <div class="scenario-item"><span class="scenario-dot"
+                            style="background: var(--accent-orange);"></span> 心情分身正戴着耳机专注于你的录入</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="avatar-lab-container">
+            <div class="section-title">心情实验室 / 50+ Avatar Variants</div>
+            <div class="avatar-wall">
+                <!-- 场景化模拟展现 -->
+                <div class="avatar-token">🎧</div>
+                <div class="avatar-token">🎨</div>
+                <div class="avatar-token">⏳</div>
+                <div class="avatar-token">🧘</div>
+                <div class="avatar-token">🚀</div>
+                <div class="avatar-token">💡</div>
+                <div class="avatar-token">🌈</div>
+                <div class="avatar-token">📷</div>
+                <div class="avatar-token">🎤</div>
+                <div class="avatar-token">🔋</div>
+                <div class="avatar-token">🧠</div>
+                <div class="avatar-token">🎯</div>
+                <div class="avatar-token">🧬</div>
+                <div class="avatar-token">🎮</div>
+                <div class="avatar-token">🍜</div>
+                <div class="avatar-token">☕</div>
+                <div class="avatar-token">⌚</div>
+                <div class="avatar-token">🌙</div>
+                <div class="avatar-token">📚</div>
+                <div class="avatar-token">🏖️</div>
+                <div class="avatar-token">💎</div>
+                <div class="avatar-token">🕶️</div>
+                <div class="avatar-token">🎩</div>
+                <div class="avatar-token">🎈</div>
+                <div class="avatar-token">🧸</div>
+                <div class="avatar-token">🍀</div>
+                <div class="avatar-token">🥑</div>
+                <div class="avatar-token">🍦</div>
+                <div class="avatar-token">🥊</div>
+                <div class="avatar-token">🎸</div>
+                <div class="avatar-token">🛹</div>
+                <div class="avatar-token">🚲</div>
+                <div class="avatar-token">🚆</div>
+                <div class="avatar-token">🛸</div>
+                <div class="avatar-token">🏰</div>
+                <div class="avatar-token">🎡</div>
+                <div class="avatar-token">🌋</div>
+                <div class="avatar-token">🌵</div>
+                <div class="avatar-token">🍄</div>
+                <div class="avatar-token">🌻</div>
+                <div class="avatar-token">🐳</div>
+                <div class="avatar-token">🦉</div>
+                <div class="avatar-token">🦊</div>
+                <div class="avatar-token">🦁</div>
+                <div class="avatar-token">🐼</div>
+                <div class="avatar-token">🐨</div>
+                <div class="avatar-token">🦄</div>
+                <div class="avatar-token">🐉</div>
+                <div class="avatar-token">👾</div>
+                <div class="avatar-token">👻</div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="footer-tagline">FluxMoment：捕捉流光，有迹可循</div>
+            <div class="footer-sub">Explore your digital consciousness | Since 2026</div>
+        </footer>
+    </div>
+
+</body>
+
+</html>
