@@ -109,8 +109,23 @@ textarea:focus {
 }
 
 .notion-card .card-delete-btn:hover {
-  color: #e53e3e !important;
-  background: #fff5f5 !important;
+  color: #ef4444 !important;
+  background: #fef2f2 !important;
+}
+
+/* Entry-level delete: only show when hovering the specific row */
+.entry-row .entry-delete-btn {
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.entry-row:hover .entry-delete-btn {
+  opacity: 1;
+}
+
+.entry-delete-btn:hover {
+  color: #ef4444 !important;
+  transform: scale(1.1);
 }
 
 /* ── Utility: Primary button ── */

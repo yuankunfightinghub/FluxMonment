@@ -151,7 +151,7 @@ function App() {
 
         const queryEmb = await generateEmbedding(query);
         if (queryEmb.length > 0) {
-          const matches = await performSemanticSearch(queryEmb, threads, 0.45);
+          const matches = await performSemanticSearch(queryEmb, threads, content, 0.45);
           setSearchResults(matches);
           setIsSearchMode(true);
           setActiveTab('moments'); // 强制切回 moments 流以显示结果
@@ -176,6 +176,12 @@ function App() {
       pendingMedia.forEach(pm => URL.revokeObjectURL(pm.localUrl));
       setPendingMedia([]);
 
+      // --- RECORD 成功后：强制退出搜索模式，切回主流 ---
+      setIsSearchMode(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      setActiveTab('moments');
+
       const activeThread = updatedThreads.find(t => t.id === highlightThreadId);
       if (activeThread) setSubmittedTheme(activeThread.category.theme);
 
@@ -188,6 +194,34 @@ function App() {
       console.error('[App] handleSubmit error:', e);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const deleteEntry = async (threadId: string, entryId: string) => {
+    const thread = threads.find(t => t.id === threadId);
+    if (!thread) return;
+
+    // Filter out the specific entry
+    const updatedEntries = thread.entries.filter(e => e.id !== entryId);
+
+    if (updatedEntries.length === 0) {
+      // If no entries left, delete the entire thread
+      await deleteMoment(threadId, thread);
+    } else {
+      // Otherwise, update the thread with the remaining entries
+      const updatedThread = { ...thread, entries: updatedEntries };
+      const updatedThreads = threads.map(t => t.id === threadId ? updatedThread : t);
+
+      // Optimistic upate the local state
+      // useFirestoreSync's addMoment already handles optimistic update and syncing
+      await addMoment(updatedThreads);
+
+      // Clean up storage for the deleted entry's attachments
+      const deletedEntry = thread.entries.find(e => e.id === entryId);
+      if (deletedEntry && deletedEntry.attachments && deletedEntry.attachments.length > 0) {
+        const { deleteMedia } = await import('./lib/storage');
+        await Promise.all(deletedEntry.attachments.map(att => deleteMedia(att.url)));
+      }
     }
   };
 
@@ -410,6 +444,7 @@ function App() {
             <MomentStream
               threads={searchResults.map(r => r.thread)}
               onDelete={deleteMoment}
+              onDeleteEntry={deleteEntry}
               isSearchMode={true}
             />
 
@@ -423,9 +458,16 @@ function App() {
             )}
           </div>
         ) : activeTab === 'moments' ? (
-          <MomentStream threads={threads} onDelete={deleteMoment} />
+          <MomentStream
+            threads={threads}
+            onDelete={deleteMoment}
+            onDeleteEntry={deleteEntry}
+          />
         ) : (
-          <DailyMemory todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, new Date()))} />
+          <DailyMemory
+            todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, new Date()))}
+            onDeleteEntry={deleteEntry}
+          />
         )}
       </div>
 

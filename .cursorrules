@@ -1,0 +1,15 @@
+# FluxMoment AI Coding Rules
+
+## 1. Prompt 稳定性准则 (Prompt Stability)
+- 修改 `classificationEngine.ts` 中的 Prompt 时，严禁使用 `...` 这种简写占位符。
+- 必须完整描述 Grade A (事实)、Grade B (感性)、Grade C (杂音) 的分级策略，确保逻辑闭环。
+
+## 2. 编辑安全性 (Edit Safety)
+- 在执行代码替换前，需在思考链 (Thought) 中对比：新代码是否意外删除了旧代码中的关键分支。
+- 修改后需主动确认关键 Few-Shot 示例是否仍符合当前逻辑。
+
+## 4. 浏览器与工具授权 (Browser & Tool Permissions) // turbo-all
+- 允许 AI 自动访问 `http://localhost:5173/` 及其子页面进行 UI 检查和功能验证。
+- 允许 AI 在浏览器环境（localhost）中自动执行 JavaScript 片段以获取页面状态或模拟交互（如 hover）。
+- 允许 AI 自动使用 `view_file`、`list_dir` 和 `grep_search` 等只读类分析工具。
+- **注意**：只有浏览器相关的 JS 执行和 localhost 访问被视为默认安全，涉及 shell 命令的非只读操作仍需手动批准。

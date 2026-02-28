@@ -6,10 +6,11 @@ import { TimelineCard } from './TimelineCard';
 interface MomentStreamProps {
     threads: EventThread[];
     onDelete?: (threadId: string, thread: EventThread) => void;
+    onDeleteEntry?: (threadId: string, entryId: string) => void;
     isSearchMode?: boolean;
 }
 
-export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete }) => {
+export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete, onDeleteEntry }) => {
     const [displayLimit, setDisplayLimit] = useState(10);
 
     if (threads.length === 0) {
@@ -49,6 +50,7 @@ export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete })
                                 thread={thread}
                                 index={index}
                                 onDelete={() => onDelete?.(thread.id, thread)}
+                                onDeleteEntry={(entryId) => onDeleteEntry?.(thread.id, entryId)}
                             />
                         </div>
                     ))}

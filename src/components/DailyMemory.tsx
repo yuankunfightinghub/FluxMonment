@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Circle, Plus, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Circle, Plus, RefreshCw, X } from 'lucide-react';
 import type { EventThread, DailyMemoryData, TimelineEntry, EndOfDayTask } from '../types';
 import { generateDailySummary } from '../utils/classificationEngine';
 import { format } from 'date-fns';
@@ -9,9 +9,10 @@ import { MediaMosaic } from './MediaMosaic';
 
 interface DailyMemoryProps {
     todayThreads: EventThread[];
+    onDeleteEntry?: (threadId: string, entryId: string) => void;
 }
 
-export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
+export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDeleteEntry }) => {
     const [data, setData] = useState<DailyMemoryData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [tasks, setTasks] = useState<EndOfDayTask[]>([]);
@@ -146,19 +147,22 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                 }} />
 
                 {/* Card Container */}
-                <div style={{
-                    background: isHovered ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.6)',
-                    backdropFilter: 'blur(8px)',
-                    WebkitBackdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(0,0,0,0.03)',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
-                    boxShadow: isHovered ? '0 8px 24px rgba(0,0,0,0.06)' : '0 2px 8px rgba(0,0,0,0.02)',
-                    transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
-                    transition: 'all 0.3s ease',
-                    cursor: 'default',
-                    overflow: 'hidden'
-                }}>
+                <div
+                    className="entry-row"
+                    style={{
+                        background: isHovered ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(0,0,0,0.03)',
+                        borderRadius: '12px',
+                        padding: '12px 14px',
+                        boxShadow: isHovered ? '0 8px 24px rgba(0,0,0,0.06)' : '0 2px 8px rgba(0,0,0,0.02)',
+                        transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
+                        transition: 'all 0.3s ease',
+                        cursor: 'default',
+                        overflow: 'hidden'
+                    }}
+                >
                     {/* Header: Time + Title + Thumbnail */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ flex: 1 }}>
@@ -170,20 +174,50 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads }) => {
                             </div>
                         </div>
 
-                        {/* Persistent Thumbnail (fades on hover) */}
-                        {hasMedia && mediaUrl && (
-                            <div style={{
-                                width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0, marginLeft: '12px',
-                                border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden',
-                                opacity: isHovered ? 0.2 : 1, transition: 'opacity 0.3s ease'
-                            }}>
-                                {isVideo ? (
-                                    <video src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
-                                ) : (
-                                    <img src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="thumb" />
-                                )}
-                            </div>
-                        )}
+                        {/* Delete Button (visible on hover) */}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                            {onDeleteEntry && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm('确定要删除这条记录吗？')) {
+                                            onDeleteEntry(item.thread.id, item.entry.id);
+                                        }
+                                    }}
+                                    style={{
+                                        transition: 'all 0.2s',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        marginTop: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        border: 'none',
+                                        background: 'transparent'
+                                    }}
+                                    className="entry-delete-btn"
+                                    title="删除此项记录"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+
+                            {hasMedia && mediaUrl && (
+                                <div style={{
+                                    width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0,
+                                    border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden',
+                                    opacity: isHovered ? 0.2 : 1, transition: 'opacity 0.3s ease'
+                                }}>
+                                    {isVideo ? (
+                                        <video src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
+                                    ) : (
+                                        <img src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="thumb" />
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Expandable Details */}

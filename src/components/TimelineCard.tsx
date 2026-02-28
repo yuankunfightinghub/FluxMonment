@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import type { EventThread } from '../types';
 import MomentAvatar from './MomentAvatar';
 import { MediaMosaic } from './MediaMosaic';
@@ -9,9 +9,10 @@ interface TimelineCardProps {
     thread: EventThread;
     index: number;
     onDelete?: () => void;
+    onDeleteEntry?: (entryId: string) => void;
 }
 
-export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDelete }) => {
+export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDelete, onDeleteEntry }) => {
     const isWork = thread.category.theme === 'cyber-blue';
 
     // Keep original icon / accent colors based on user feedback
@@ -148,6 +149,7 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                                 initial={{ opacity: 0, x: -8 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: idx * 0.06, duration: 0.25 }}
+                                className="entry-row"
                                 style={{
                                     display: 'flex',
                                     gap: isSingle ? '0px' : '14px',
@@ -172,17 +174,50 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                                 )}
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
-                                    <span style={{
-                                        fontSize: '11px',
-                                        color: 'var(--text-muted)',
-                                        fontVariantNumeric: 'tabular-nums',
-                                        letterSpacing: '0.01em',
-                                    }}>
-                                        {new Date(entry.timestamp).toLocaleString([], {
-                                            month: 'short', day: 'numeric',
-                                            hour: '2-digit', minute: '2-digit'
-                                        })}
-                                    </span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{
+                                            fontSize: '11px',
+                                            color: 'var(--text-muted)',
+                                            fontVariantNumeric: 'tabular-nums',
+                                            letterSpacing: '0.01em',
+                                        }}>
+                                            {new Date(entry.timestamp).toLocaleString([], {
+                                                month: 'short', day: 'numeric',
+                                                hour: '2-digit', minute: '2-digit'
+                                            })}
+                                        </span>
+
+                                        {/* Row-level delete closer to timestamp */}
+                                        {onDeleteEntry && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm('确定要删除这条记录吗？')) {
+                                                        onDeleteEntry(entry.id);
+                                                    }
+                                                }}
+                                                className="entry-delete-btn"
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    color: 'var(--text-placeholder)',
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s',
+                                                    marginLeft: '8px',
+                                                    flexShrink: 0
+                                                }}
+                                                title="删除记录"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
                                     {entry.content && (
                                         <span style={{
                                             fontSize: '15px',

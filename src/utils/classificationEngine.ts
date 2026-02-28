@@ -83,10 +83,12 @@ function pickAvatarVariant(text: string, categoryName: string): number {
 
 // ─── LLM API ────────────────────────────────────────────────────────────
 // 默认支持 SiliconFlow，亦可通过环境变量切换至 OpenRouter 等任意兼容 OpenAI 格式的服务
-const LLM_API_KEY = (import.meta.env.VITE_LLM_API_KEY as string | undefined) || (import.meta.env.VITE_SILICONFLOW_API_KEY as string | undefined) || '';
-const LLM_ENDPOINT = (import.meta.env.VITE_LLM_ENDPOINT as string | undefined) || 'https://api.siliconflow.cn/v1/chat/completions';
-const MODEL_NAME = (import.meta.env.VITE_LLM_MODEL as string | undefined) || 'deepseek-ai/DeepSeek-V3';
-const FAST_MODEL_NAME = (import.meta.env.VITE_LLM_FAST_MODEL as string | undefined) || 'Qwen/Qwen2.5-7B-Instruct';
+const LLM_API_KEY = (import.meta.env.VITE_LLM_API_KEY as string | undefined) || '';
+const LLM_ENDPOINT = (import.meta.env.VITE_LLM_ENDPOINT as string | undefined) || '/dashscope/compatible-mode/v1/chat/completions';
+const MODEL_NAME = (import.meta.env.VITE_LLM_MODEL as string | undefined) || 'qwen-plus';
+const FAST_MODEL_NAME = (import.meta.env.VITE_LLM_FAST_MODEL as string | undefined) || 'qwen-plus';
+const EMBEDDING_ENDPOINT = (import.meta.env.VITE_EMBEDDING_ENDPOINT as string | undefined) || '/dashscope/compatible-mode/v1/embeddings';
+const EMBEDDING_MODEL = (import.meta.env.VITE_EMBEDDING_MODEL as string | undefined) || 'text-embedding-v3';
 
 /**
  * Build the structured prompt for LLM.
@@ -99,50 +101,58 @@ function buildPrompt(content: string, existingThreads: EventThread[]): string {
         .filter(t => now - t.lastUpdatedAt <= ONE_HOUR_MS)
         .map(t => ({ id: t.id, title: t.title, category: t.category.name }));
 
-    return `你是一个个人时刻记录助手，分析用户输入的一条记录，返回严格的 JSON 格式分析结果。
+    return `你是一个个人时刻记录助手，负责分析用户输入并返回严格的 JSON。请执行以下【输入分级策略】与【逻辑提取】：
+
+### 第一步：判定输入评级 (Internal Grading)
+- **Grade A (核心事实)**: 包含明确动作、对象或成果。如：“解决XX问题”、“完成XX部署”。
+- **Grade B (碎碎念/情感)**: 描述心情、琐事或感悟。如：“今天好累”、“想去旅行”。
+- **Grade C (无效/噪声)**: 极短、符号、乱码或测试词。如：“...”、“123”。
+
+### 第二步：提取规则 (Strict Rule)
+1. **Grade A 极简公式**: 标题 = [核心实体 + 状态]。必须剔除“问题”、“解决”、“任务”、“进行”、“完成”等冗余动向词。
+   - 范例：“数据源付费墙豁免问题已解决” -> **“付费墙豁免”**
+   - 范例：“完成商业化弹窗验收” -> **“弹窗验收”**
+2. **Grade B 感性公式**: 标题使用具象描述短句，侧重情感表达。
+3. **Grade C 兜底逻辑**: 标题统一返回“瞬时闪念”，标签统一为 ["碎片"]。
+
+### 第三步：返回 JSON 结构
+{
+  "category": {
+    "name": "分类(6字内，如：业务研发、亲子时光、生活杂记)",
+    "theme": "cyber-blue 或 sunset-orange"
+  },
+  "title": "标题（严格按上述分级策略提炼）",
+  "tags": ["核心标签1", "核心标签2"],
+  "mood": "从以下选一：happy, excited, proud, playful, curious, focused, calm, cozy, tired, adventurous",
+  "avatarVariant": 22,
+  "matchedThreadId": "历史 id 或 null（极其严格：若当前输入与历史卡片的具体业务主体、功能点、特定对象发生任何偏移，必须返回 null。严禁仅因共享‘数据源’、‘AI’等通用关键词而合并！）"
+}
+
+【图标分发指南 (avatarVariant 小图标数字 0-49)】:
+- 核心产出/成就/验收：22(火箭), 2(皇冠), 44(闪电)
+- 沉浸工作/深度思考：28(耳机), 29(单片眼镜), 27(书生眼镜), 32(领带), 38(书本)
+- 饮食/美食/休闲：36(咖啡杯), 37(蛋糕), 4(厨师帽)
+- 娱乐/庆祝/艺术：47(音符), 40(彩色点阵), 26(墨镜), 16(彩虹)
+- 出行/旅行/自然：21(小飞机), 34(小背包), 5(鸭舌帽), 17(白云), 42(雨云), 43(雪花)
+- 日常/可爱/心情：11(小鸭子), 12(猫耳), 13(兔耳), 41(红心), 35(项链)
+
+【参考范例 (Few-Shot)】：
+- 输入(Grade A): "数据源付费墙豁免问题已解决" -> {"category": {"name": "业务研发", "theme": "cyber-blue"}, "title": "付费墙豁免", "tags": ["付费墙", "数据源"], "avatarVariant": 22, "matchedThreadId": null}
+- 输入(Grade A): "完成验收商业化升级弹窗" -> {"category": {"name": "业务验收", "theme": "cyber-blue"}, "title": "升级弹窗验收", "tags": ["商业化", "升级弹窗"], "avatarVariant": 2, "matchedThreadId": null}
+- 输入(Grade B): "这周感觉好累，想去海边散散心" -> {"category": {"name": "琐碎生活", "theme": "sunset-orange"}, "title": "想去海边", "tags": ["散心", "减压"], "mood": "tired", "avatarVariant": 17, "matchedThreadId": null}
+- 输入(Grade C): "...测试123" -> {"category": {"name": "碎片", "theme": "sunset-orange"}, "title": "瞬时闪念", "tags": ["碎片"], "avatarVariant": 0}
+
+【合并判定准则 (Crucial)】：
+1. 实体一致性：即便动作相同（如：都是“已解决”），但对象不同（如：付费墙 vs 评价数据），严禁合并！必须返回 null。
+2. 场景延续性：只有在处理“同一件事的后续进度”时才能合并。如果是开启了同一个大分类下的“新任务”，必须创建新卡片。
 
 用户输入：
 "${content}"
 
-最近 2 小时内已有的话题卡片（可能为空）：
-${recentThreads.length > 0 ? JSON.stringify(recentThreads, null, 2) : '（暂无）'}
+最近已有话题卡片：
+${recentThreads.length > 0 ? JSON.stringify(recentThreads) : '（暂无）'}
 
-请返回以下 JSON（仅返回 JSON，不要 markdown 代码块，不要其他文字）：
-{
-  "category": {
-    "name": "子分类名字（简洁提取输入内容中做的事项或讨论内容的总结主题，如：方案评审、接口开发、带娃玩耍、美食探店等，8字以内）",
-    "theme": "cyber-blue 或 sunset-orange（工作/学习类用 cyber-blue，生活/休闲类用 sunset-orange）"
-  },
-  "title": "卡片标题（10字以内，简洁概括这条记录的核心事件，类似新闻标题）",
-  "tags": ["关键词1", "关键词2"],
-  "mood": "从以下选一个：happy、excited、proud、playful、curious、focused、calm、cozy、tired、adventurous",
-  "avatarVariant": 28,
-  "matchedThreadId": "如果语义上应该合并到已有某个话题卡片，填其 id；否则填 null"
-}
-
-关于 avatarVariant，请根据事件、人物、情感等，从以下数字（0-49）中选一个最符合语境的小图标装饰（只填数字）：
-- 学习/工作/专注：27(书生眼镜), 28(耳机), 32(领带), 29(单片眼镜), 38(书本), 4(厨师帽)
-- 饮食/美食：36(咖啡杯), 37(蛋糕)
-- 娱乐/音乐/庆祝：47(音符), 2(皇冠), 40(彩色圆点雨), 26(太阳眼镜)
-- 出行/旅行/户外：5(鸭舌帽), 6(牛仔帽), 8(渔夫帽), 21(小飞机), 22(小火箭), 34(小背包)
-- 天气/自然：17(云朵), 42(下雨云), 43(雪花), 44(闪电)
-- 日常心情/可爱：11(小鸭子), 12(小猫耳), 13(兔耳), 16(彩虹), 41(心形), 35(珍珠项链)
-- ⚠️极度重要：如果是普通的工作、写代码、打卡等没有明显装饰倾向的输入，**绝不要**死板地返回 0！请发挥你的想象力，从以上列表中挑选一款能增加趣味性的挂饰（比如工作可以带 28耳机，或者是 40彩色圆点雨、36咖啡杯）。尽可能少返回 0，让每个瞬间都生动起来！
-注意：
-- tags 最多 5 个。
-- 业务互斥逻辑：对于工作类（cyber-blue），“商业化”、“数据连接”、“AI 助理”是互斥的标签，每条记录只能在 tags 中包含其中【最多一个】。
-- **深度场景判定逻辑（核心）**：请按以下顺序进行分类思考：
-  1. **受益主体与目标**：判断该行为的最终受益人。如果行为是为了家人、亲情陪伴、个人爱好（如：给孩子做AI玩具、教家人写代码），即便使用了专业技术工具，其内核也是【生活/休闲类 (sunset-orange)】。
-  2. **事实执行重心**：如果主动作是执行职场任务、处理业务逻辑、参加职业会议，即使提到了家人作为背景（如：本想陪女儿但不得不加班），其分类权重依然属于【工作/学习类 (cyber-blue)】。
-  3. **关键词权重降级**：当“AI”、“编程”、“代码”、“方案”与“家人名称”同时出现。如果家人是动作的【对象】（为谁做），则技术词汇降级为生活工具，分类为生活；如果家人是【背景/干扰项】（因为工作没能...），分类为工作。
-
-- **分类判定参考范例 (Few-Shot)**：
-  - 输入："给女儿用 Python 写了个自动涂色卡" -> 分类：{"name": "亲子互动", "theme": "sunset-orange"} (原因：受益人是家人)
-  - 输入："虽然原本想陪女儿，但临时的 Python 脚本出 Bug 必须处理" -> 分类：{"name": "Bug修复", "theme": "cyber-blue"} (原因：动作重心是处理任务)
-  - 输入："今天教老婆怎么用 AI 助理帮她整理食谱" -> 分类：{"name": "生活百科", "theme": "sunset-orange"} (原因：场景是家庭社交)
-
-- 关于 matchedThreadId：非常严格！只有当本次输入与列表中某张历史卡片在【人物】、【事件动作】、【环境/上下文】这三要素上具备高度一致性与场景延续性时，才能填入其 id（进行聚合归属于同一话题）。如果只是类别相同但具体讲的事情截然不同（比如之前在吃面，现在在喝奶茶），则必须返回 null 创建独立卡片！！
-- 仅返回 JSON，不含任何额外说明。`;
+请仅返回 JSON 文本。`;
 }
 
 
@@ -178,9 +188,9 @@ async function callLLMAPI(content: string, existingThreads: EventThread[]): Prom
             ],
             temperature: 0.3,
             max_tokens: 1024,
-            response_format: { type: 'json_object' } // 要求强制 JSON 输出
+            // response_format: { type: 'json_object' } // 暂时移除以防兼容性问题
         }),
-        signal: AbortSignal.timeout(15000), // OpenAI format might be slower, give it 15s
+        signal: AbortSignal.timeout(120000), // 400B 模型可能需要极长启动时间，延长至 120s
     });
 
     if (!res.ok) {
@@ -199,10 +209,13 @@ async function callLLMAPI(content: string, existingThreads: EventThread[]): Prom
     const jsonText = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsed = JSON.parse(jsonText);
 
-    // Normalise and validate
+    // Normalise and validate (Robust parsing for both nested and flat JSON)
+    const rawTheme = parsed.category?.theme || parsed.theme;
+    const rawCategoryName = parsed.category?.name || parsed.categoryName || '工作学习';
+
     const category: EventCategory = {
-        name: String(parsed.category?.name ?? '生活杂记'),
-        theme: parsed.category?.theme === 'cyber-blue' ? 'cyber-blue' : 'sunset-orange',
+        name: String(rawCategoryName),
+        theme: rawTheme === 'sunset-orange' ? 'sunset-orange' : 'cyber-blue', // 默认设为蓝（工作）
     };
     const title = String(parsed.title ?? '生活记录');
     const tags: string[] = Array.isArray(parsed.tags)
@@ -307,14 +320,14 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     if (!LLM_API_KEY) return [];
 
     try {
-        const res = await fetch('https://api.siliconflow.cn/v1/embeddings', {
+        const res = await fetch(EMBEDDING_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${LLM_API_KEY}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'BAAI/bge-m3', // SiliconFlow 免费的特征提取基座模型
+                model: EMBEDDING_MODEL,
                 input: text,
                 encoding_format: 'float'
             }),
@@ -433,6 +446,7 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
 export async function performSemanticSearch(
     queryVec: number[],
     threads: EventThread[],
+    originalQuery?: string, // 传入原始查询文本以便 Rerank
     threshold = 0.5,
     maxResults = 10
 ): Promise<{ thread: EventThread; similarity: number }[]> {
@@ -452,20 +466,103 @@ export async function performSemanticSearch(
         })
         .sort((a, b) => b.similarity - a.similarity);
 
-    // 调试打印前 3 名，无论是否超过阈值
-    if (allScores.length > 0) {
-        console.group('🔍 语义匹配得分排名前 3:');
-        allScores.slice(0, 3).forEach((s, i) => {
-            console.log(`${i + 1}. [Score: ${s.similarity.toFixed(4)}] Title: ${s.thread.title}`);
-        });
-        console.groupEnd();
-    }
-
     const results = allScores
         .filter(res => res.similarity >= threshold)
         .slice(0, maxResults);
 
+    console.group('%c🔍 向量初筛 (Vector Retrieval)', 'color: #27ae60; font-weight: bold;');
+    console.log(`[召回策略] 相似度阈值: ${threshold}, 最大召回: ${maxResults}`);
+    if (allScores.length > 0) {
+        console.table(allScores.slice(0, 5).map(s => ({
+            '卡片标题': s.thread.title,
+            '向量相似度': s.similarity.toFixed(4),
+            '是否由于阈值过滤': s.similarity < threshold ? '❌ 已过滤' : '✅ 保留'
+        })));
+    }
+    console.groupEnd();
+
+    // --- 核心优化：AI 精准重排与过滤 ---
+    if (results.length > 0 && originalQuery) {
+        return await aiRerankResults(results, originalQuery);
+    }
+
     return results;
+}
+
+/**
+ * AI 二次审阅 (Rerank)：将向量召回的结果交给 LLM 判定是否真实相关。
+ * 这将彻底解决“搜 AI 却返回非 AI”的问题。
+ */
+export async function aiRerankResults(
+    candidates: { thread: EventThread; similarity: number }[],
+    originalQuery: string
+): Promise<{ thread: EventThread; similarity: number }[]> {
+    if (!LLM_API_KEY || candidates.length === 0) return candidates;
+
+    const context = candidates.map((c, i) =>
+        `[ID: ${i}] Title: ${c.thread.title}\nContent: ${c.thread.entries.map(e => e.content).join('; ')}`
+    ).join('\n\n');
+
+    const prompt = `你是一个极度严苛的日记搜索质检员。用户提出了一个具体的问题，你需要审查候选记录是否【直接且明确地】符合问题的主题。
+
+【绝对剔除准则 - 只要符合一条就剔除】：
+1. 任务状态噪音：如果记录仅仅是描述“我正在做某项办公任务”（如：文案梳理、导表、开会、整理数据源），且并未包含问题所要求的【实质内容】，必须剔除。
+   - 反例：提问“AI心得”，记录“正在梳理AI数据源介绍页文案”。(虽然含AI词，但属于办公状态，无心得，剔除！) 
+2. 语义漂移：如果记录的主题是 A，只是为了描述 A 顺便提到了词汇 B。
+   - 反例：提问“电影”，记录“今天带娃去商场，路过了电影院”。(主题是带娃，剔除！)
+3. 概括模棱两可：如果记录内容太简短，无法确定是否符合要求，请保守剔除。
+
+用户原始问题： "${originalQuery}"
+
+待审核候选结果：
+${context}
+
+请仅返回真正相关的 ID 数组。宁肯漏掉，绝不误杀。
+返回值格式：{"relevantIds": [0, 2, 5]}`;
+
+    try {
+        console.group('%c🧠 AI 二次审阅 (Rerank Phase)', 'color: #8e44ad; font-weight: bold;');
+        const res = await fetch(LLM_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${LLM_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: FAST_MODEL_NAME,
+                messages: [{ role: 'system', content: prompt }],
+                temperature: 0.1,
+                response_format: { type: 'json_object' }
+            }),
+            signal: AbortSignal.timeout(60000)
+        });
+
+        if (!res.ok) {
+            console.warn('[Rerank] 网络请求失败，跳过过滤');
+            console.groupEnd();
+            return candidates;
+        }
+
+        const data = await res.json();
+        const rawContent = data.choices?.[0]?.message?.content ?? '{"relevantIds": []}';
+        const parsed = JSON.parse(rawContent);
+        const keepIds: number[] = parsed.relevantIds || [];
+
+        const finalResults = keepIds.map(id => candidates[id]).filter(Boolean);
+
+        console.log('%c[Rerank 策略]:', 'color: #7f8c8d;', '过滤冗余条目，仅保留强相关事实');
+        console.log('%c[判定结果]:', 'color: #27ae60; font-weight: bold;', `从 ${candidates.length} 条中保留了 ${finalResults.length} 条`);
+        if (finalResults.length > 0) {
+            console.table(finalResults.map(r => ({ '最终展示标题': r.thread.title })));
+        } else {
+            console.log('%c[Result]: ❌ 无高度匹配内容，已拦截无关显示', 'color: #e74c3c;');
+        }
+        console.groupEnd();
+
+        return finalResults;
+    } catch (e) {
+        return candidates; // 出错则保留原始向量搜索结果
+    }
 }
 
 // Fast sync classifier for live capsule glow
@@ -534,7 +631,7 @@ ${eventsText}
       "time": "HH:mm",
       "coreSummary": "一句话概括事实",
       "poeticInterpretation": "诗意的解读（15字内）",
-      "originalRecord": "原文一字不差复制",
+      "originalRecord": "用户原始文字内容（！必须剔除开头的 [时间] 和 (ID: ...) 标记，仅保留用户输入的纯净文字）",
       "emotionalFeedback": "温暖反馈（10字内）",
       "bgMediaUrl": "附件url（如果有）",
       "bgMediaType": "image/video（如果有）"
@@ -648,21 +745,25 @@ export async function detectUserIntent(content: string): Promise<IntentClassific
     // 如果未配置 API 或输入太短（例如只有1个字），直接认为是记录，不浪费网络请求
     if (!LLM_API_KEY || content.trim().length <= 1) return defaultResult;
 
-    const prompt = `你是一个用于个人记忆应用的上下文感知路由助手。
-你唯一的任务是分析用户的输入文本，并将其“意图”(INTENT) 准确分类为以下两类之一：
+    const prompt = `你是一个用于个人记忆应用的意图路由助手。
+你的任务是分析用户的输入文本，并将其准确分类为 "SEARCH" 或 "RECORD"。
 
-1. "SEARCH"（搜索）：用户试图查找、检索或提问关于他们过去的记忆、事件或想法。
-2. "RECORD"（记录）：用户正在创建一段新记忆、记录当前事件或想法。
+【核心判定逻辑】：
+1. RECORD (记录优先): 这是个人日记应用，默认意图应偏向记录。当用户输入一段包含【具体动作 + 业务对象】的事实时，即便没有使用"已"、"了"，只要它是在陈述一个完成的任务或当下的状态，必须判定为 RECORD。
+   - 示例: "数据源付费墙豁免问题给出方案快速解决大客户问题" -> RECORD (正在记录解决方案)
+   - 示例: "拉通了淘宝生意参谋数据" -> RECORD (记录进度)
+2. SEARCH (搜索判定): 只有当用户明确表现出“回顾”、“提问”或“查找历史”的意图时，才判定为 SEARCH。
+   - 标志: 包含问号 (?)、疑问词（如何、什么、哪里、为什么）、或显性查询动词（查找、查下、搜下、回顾、汇总）。
+   - 示例: "付费墙问题是怎么解决的？" -> SEARCH
+   - 示例: "帮我搜下关于大客户的方案" -> SEARCH
 
-对于 "SEARCH" 意图，你必须进行 "Query Refinement"（查询改写）：
-- 不要只提取关键词。
-- 请联想：如果用户确实记录过相关内容，那条记录可能会包含哪些【动作、工具名、细分场景、情绪或具体实体】？
-- 将原始提问转化为一段具有丰富语义的“模拟描述文本”，用空格分隔，以利于向量匹配。
-- 例如：输入“AI 使用心得” -> 输出“AI LLM 大模型 Claude ChatGPT 提示词工程 提效 使用体验 调优 心得体会”。
+【Query Refinement (仅针对 SEARCH)】:
+- 如果判定为 SEARCH，请将用户的原始提问转换为提取了核心实体名词的搜索词。
+- 严禁空泛联想，保持检索词的精确性。
 
+【输出格式】:
 你必须且只能输出一个有效的 JSON 对象：
-{"intent": "RECORD"} 或 {"intent": "SEARCH", "query": "改写后的语义描述文本"}
-
+{"intent": "RECORD"} 或 {"intent": "SEARCH", "query": "改写后的搜索核心词"}
 不要输出任何其他内容。`;
 
     try {
@@ -684,7 +785,7 @@ export async function detectUserIntent(content: string): Promise<IntentClassific
                 temperature: 0.1, // 低温，追求确定性分类
                 response_format: { type: 'json_object' }
             }),
-            signal: AbortSignal.timeout(5000), // 必须极快，5秒超时则强制 fallback 为记录模式
+            signal: AbortSignal.timeout(60000), // 适配超大规模模型，延长至 60s
         });
 
         if (!res.ok) {
@@ -702,7 +803,9 @@ export async function detectUserIntent(content: string): Promise<IntentClassific
 
         const parsed = JSON.parse(jsonText);
 
-        console.log('%c[AI] Intent Result:', 'color: #f39c12; font-weight: bold;', parsed);
+        console.group('%c🎯 搜索意图识别过程', 'color: #f39c12; font-weight: bold;');
+        console.log('%c[1. 原始输入]:', 'color: #7f8c8d; font-weight: bold;', content);
+        console.log('%c[2. 进化后的语义描述]:', 'color: #2980b9; font-weight: bold;', parsed.query);
         console.groupEnd();
 
         if (parsed.intent === 'SEARCH') {
