@@ -1,5 +1,6 @@
-import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType, DailyMemoryData } from '../types';
+import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType, DailyMemoryData } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
+import { buildSharedPrompt, parseLLMResponse, pickAvatarVariant } from './aiLogicCore.js';
 
 /**
  * Mock LLM Service Response Type
@@ -68,18 +69,7 @@ function detectMood(text: string, isWork: boolean): MoodType {
     return isWork ? 'focused' : 'calm';
 }
 
-/**
- * Pick a deterministic avatar variant (0-49) from text content hash.
- * Same category + similar content stays visually consistent.
- */
-function pickAvatarVariant(text: string, categoryName: string): number {
-    const combined = categoryName + text.slice(0, 30);
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-        hash = (hash * 31 + combined.charCodeAt(i)) >>> 0;
-    }
-    return hash % 50;
-}
+// 移除本地重复的 pickAvatarVariant，已从 aiLogicCore 导入
 
 // ─── LLM API ────────────────────────────────────────────────────────────
 // 默认支持 SiliconFlow，亦可通过环境变量切换至 OpenRouter 等任意兼容 OpenAI 格式的服务
@@ -95,64 +85,7 @@ const EMBEDDING_MODEL = (import.meta.env.VITE_EMBEDDING_MODEL as string | undefi
  * We pass recent threads so LLM can decide whether to merge.
  */
 function buildPrompt(content: string, existingThreads: EventThread[]): string {
-    const ONE_HOUR_MS = 60 * 60 * 1000;
-    const now = Date.now();
-    const recentThreads = existingThreads
-        .filter(t => now - t.lastUpdatedAt <= ONE_HOUR_MS)
-        .map(t => ({ id: t.id, title: t.title, category: t.category.name }));
-
-    return `你是一个个人时刻记录助手，负责分析用户输入并返回严格的 JSON。请执行以下【输入分级策略】与【逻辑提取】：
-
-### 第一步：判定输入评级 (Internal Grading)
-- **Grade A (核心事实)**: 包含明确动作、对象或成果。如：“解决XX问题”、“完成XX部署”。
-- **Grade B (碎碎念/情感)**: 描述心情、琐事或感悟。如：“今天好累”、“想去旅行”。
-- **Grade C (无效/噪声)**: 极短、符号、乱码或测试词。如：“...”、“123”。
-
-### 第二步：提取规则 (Strict Rule)
-1. **Grade A 极简公式**: 标题 = [核心实体 + 状态]。必须剔除“问题”、“解决”、“任务”、“进行”、“完成”等冗余动向词。
-   - 范例：“数据源付费墙豁免问题已解决” -> **“付费墙豁免”**
-   - 范例：“完成商业化弹窗验收” -> **“弹窗验收”**
-2. **Grade B 感性公式**: 标题使用具象描述短句，侧重情感表达。
-3. **Grade C 兜底逻辑**: 标题统一返回“瞬时闪念”，标签统一为 ["碎片"]。
-
-### 第三步：返回 JSON 结构
-{
-  "category": {
-    "name": "分类(6字内，如：业务研发、亲子时光、生活杂记)",
-    "theme": "cyber-blue 或 sunset-orange"
-  },
-  "title": "标题（严格按上述分级策略提炼）",
-  "tags": ["核心标签1", "核心标签2"],
-  "mood": "从以下选一：happy, excited, proud, playful, curious, focused, calm, cozy, tired, adventurous",
-  "avatarVariant": 22,
-  "matchedThreadId": "历史 id 或 null（极其严格：若当前输入与历史卡片的具体业务主体、功能点、特定对象发生任何偏移，必须返回 null。严禁仅因共享‘数据源’、‘AI’等通用关键词而合并！）"
-}
-
-【图标分发指南 (avatarVariant 小图标数字 0-49)】:
-- 核心产出/成就/验收：22(火箭), 2(皇冠), 44(闪电)
-- 沉浸工作/深度思考：28(耳机), 29(单片眼镜), 27(书生眼镜), 32(领带), 38(书本)
-- 饮食/美食/休闲：36(咖啡杯), 37(蛋糕), 4(厨师帽)
-- 娱乐/庆祝/艺术：47(音符), 40(彩色点阵), 26(墨镜), 16(彩虹)
-- 出行/旅行/自然：21(小飞机), 34(小背包), 5(鸭舌帽), 17(白云), 42(雨云), 43(雪花)
-- 日常/可爱/心情：11(小鸭子), 12(猫耳), 13(兔耳), 41(红心), 35(项链)
-
-【参考范例 (Few-Shot)】：
-- 输入(Grade A): "数据源付费墙豁免问题已解决" -> {"category": {"name": "业务研发", "theme": "cyber-blue"}, "title": "付费墙豁免", "tags": ["付费墙", "数据源"], "avatarVariant": 22, "matchedThreadId": null}
-- 输入(Grade A): "完成验收商业化升级弹窗" -> {"category": {"name": "业务验收", "theme": "cyber-blue"}, "title": "升级弹窗验收", "tags": ["商业化", "升级弹窗"], "avatarVariant": 2, "matchedThreadId": null}
-- 输入(Grade B): "这周感觉好累，想去海边散散心" -> {"category": {"name": "琐碎生活", "theme": "sunset-orange"}, "title": "想去海边", "tags": ["散心", "减压"], "mood": "tired", "avatarVariant": 17, "matchedThreadId": null}
-- 输入(Grade C): "...测试123" -> {"category": {"name": "碎片", "theme": "sunset-orange"}, "title": "瞬时闪念", "tags": ["碎片"], "avatarVariant": 0}
-
-【合并判定准则 (Crucial)】：
-1. 实体一致性：即便动作相同（如：都是“已解决”），但对象不同（如：付费墙 vs 评价数据），严禁合并！必须返回 null。
-2. 场景延续性：只有在处理“同一件事的后续进度”时才能合并。如果是开启了同一个大分类下的“新任务”，必须创建新卡片。
-
-用户输入：
-"${content}"
-
-最近已有话题卡片：
-${recentThreads.length > 0 ? JSON.stringify(recentThreads) : '（暂无）'}
-
-请仅返回 JSON 文本。`;
+    return buildSharedPrompt(content, existingThreads);
 }
 
 
@@ -206,51 +139,7 @@ async function callLLMAPI(content: string, existingThreads: EventThread[]): Prom
     console.groupEnd();
 
     // 解析 JSON
-    const jsonText = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const parsed = JSON.parse(jsonText);
-
-    // Normalise and validate (Robust parsing for both nested and flat JSON)
-    const rawTheme = parsed.category?.theme || parsed.theme;
-    const rawCategoryName = parsed.category?.name || parsed.categoryName || '工作学习';
-
-    const category: EventCategory = {
-        name: String(rawCategoryName),
-        theme: rawTheme === 'sunset-orange' ? 'sunset-orange' : 'cyber-blue', // 默认设为蓝（工作）
-    };
-    const title = String(parsed.title ?? '生活记录');
-    const tags: string[] = Array.isArray(parsed.tags)
-        ? parsed.tags.slice(0, 5).map(String)
-        : [];
-    const mood = (parsed.mood as MoodType) ?? 'calm';
-    const matchedThreadId = typeof parsed.matchedThreadId === 'string'
-        ? parsed.matchedThreadId
-        : null;
-    let avatarVariantNum = pickAvatarVariant(content, category.name);
-    if (parsed.avatarVariant !== undefined && parsed.avatarVariant !== null) {
-        const match = String(parsed.avatarVariant).match(/\d+/);
-        if (match) {
-            const num = parseInt(match[0], 10);
-            if (num >= 0 && num <= 49) {
-                avatarVariantNum = num;
-            }
-        }
-    }
-    const avatarVariant = avatarVariantNum;
-
-    // Verify matchedThreadId actually exists in current threads
-    const validMatchedId = existingThreads.some(t => t.id === matchedThreadId)
-        ? matchedThreadId
-        : null;
-    const matchedTitle = existingThreads.find(t => t.id === validMatchedId)?.title ?? title;
-
-    return {
-        matchedThreadId: validMatchedId,
-        title: matchedTitle,
-        category,
-        tags,
-        mood,
-        avatarVariant,
-    };
+    return parseLLMResponse(raw, content, existingThreads);
 }
 
 /**
@@ -441,52 +330,95 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
 }
 
 /**
- * 本地语义检索：根据 query 向量匹配最相关的 threads
+ * 混合动力检索：结合标签过滤、关键字强匹配与语义向量
  */
-export async function performSemanticSearch(
+export async function performHybridSearch(
     queryVec: number[],
     threads: EventThread[],
-    originalQuery?: string, // 传入原始查询文本以便 Rerank
-    threshold = 0.5,
-    maxResults = 10
+    params: { query?: string; tags?: string[]; keywords?: string[] },
+    maxResults = 15
 ): Promise<{ thread: EventThread; similarity: number }[]> {
-    if (queryVec.length === 0) return [];
+    const { query = '', tags = [], keywords = [] } = params;
 
-    const threadsWithVector = threads.filter(t => t.embedding && t.embedding.length > 0);
-    console.log(`[Search Debug] 数据总量: ${threads.length}, 拥有向量的数据量: ${threadsWithVector.length}`);
+    // 1. 三层过滤
+    const candidates = threads.map(thread => {
+        // (A) 标签硬过滤
+        if (tags.length > 0) {
+            const hasTag = tags.some(t => {
+                const lowerT = t.toLowerCase();
+                const tagMatch = thread.tags.some(tag =>
+                    tag.toLowerCase() === lowerT || tag.toLowerCase().includes(lowerT)
+                );
+                const categoryMatch = thread.category.name.toLowerCase().includes(lowerT);
+                return tagMatch || categoryMatch;
+            });
+            if (!hasTag) return null;
+        }
 
-    if (threadsWithVector.length === 0) {
-        console.warn('[Search Debug] 警告：没有任何历史记录包含向量数据，请先执行 Backfill。');
+        // (B) 关键字 AND 门控（核心升级：不含关键字直接排除，非加分）
+        const threadContent = (thread.title + ' ' + thread.entries.map(e => e.content).join(' ')).toLowerCase();
+        if (keywords.length > 0) {
+            const hasKeyword = keywords.some(kw => threadContent.includes(kw.toLowerCase()));
+            if (!hasKeyword) return null;
+        }
+
+        // (C) 向量相似度（纯排序信号）
+        const semanticSim = (thread.embedding && queryVec.length > 0)
+            ? cosineSimilarity(queryVec, thread.embedding)
+            : 0;
+
+        // 已通过门控后小幅激励以影响排名
+        let boost = 0;
+        keywords.forEach(kw => {
+            const lw = kw.toLowerCase();
+            if (thread.title.toLowerCase().includes(lw)) boost += 0.15;
+            else if (threadContent.includes(lw)) boost += 0.08;
+        });
+
+        return { thread, similarity: semanticSim + boost, baseSim: semanticSim };
+    }).filter((c): c is { thread: EventThread; similarity: number; baseSim: number } => c !== null);
+
+    candidates.sort((a, b) => b.similarity - a.similarity);
+
+    // 三档阈值（全面上调，防止技术类向量聚集导致误召回）
+    let minThreshold: number;
+    if (keywords.length > 0) {
+        minThreshold = -1; // FIX: 已通过字面门控，用负数彻底解除向量拦截机制（向量可能为负数），后续仅靠向量排序和 Rerank 把关
+    } else if (tags.length > 0) {
+        minThreshold = 0.45; // 标签已缩窄范围
+    } else {
+        minThreshold = 0.55; // 纯语义搜索，阈值最严
     }
 
-    const allScores = threadsWithVector
-        .map(thread => {
-            const sim = thread.embedding ? cosineSimilarity(queryVec, thread.embedding) : 0;
-            return { thread, similarity: sim };
-        })
-        .sort((a, b) => b.similarity - a.similarity);
+    const filtered = candidates.filter(c => c.similarity >= minThreshold).slice(0, maxResults);
 
-    const results = allScores
-        .filter(res => res.similarity >= threshold)
-        .slice(0, maxResults);
-
-    console.group('%c🔍 向量初筛 (Vector Retrieval)', 'color: #27ae60; font-weight: bold;');
-    console.log(`[召回策略] 相似度阈值: ${threshold}, 最大召回: ${maxResults}`);
-    if (allScores.length > 0) {
-        console.table(allScores.slice(0, 5).map(s => ({
-            '卡片标题': s.thread.title,
-            '向量相似度': s.similarity.toFixed(4),
-            '是否由于阈值过滤': s.similarity < threshold ? '❌ 已过滤' : '✅ 保留'
+    console.group('%c🚀 混合动力检索 (Hybrid Engine)', 'color: #e67e22; font-weight: bold;');
+    console.log(`[参数] Tags: ${tags.join(',')} | Keywords: ${keywords.join(',')} | threshold: ${minThreshold}`);
+    if (filtered.length > 0) {
+        console.table(filtered.slice(0, 8).map(s => ({
+            '标题': s.thread.title,
+            '分类': s.thread.category.name,
+            '综合评分': s.similarity.toFixed(4),
+            '向量基分': s.baseSim.toFixed(4),
         })));
+    } else {
+        console.log('%c[结果] 无符合条件的记录', 'color: #e74c3c;');
     }
     console.groupEnd();
 
-    // --- 核心优化：AI 精准重排与过滤 ---
-    if (results.length > 0 && originalQuery) {
-        return await aiRerankResults(results, originalQuery);
+    if (filtered.length > 0 && query) {
+        return await aiRerankResults(filtered, query, tags, keywords);
     }
+    return filtered;
+}
 
-    return results;
+export async function performSemanticSearch(
+    queryVec: number[],
+    threads: EventThread[],
+    originalQuery?: string,
+    maxResults = 10
+): Promise<{ thread: EventThread; similarity: number }[]> {
+    return performHybridSearch(queryVec, threads, { query: originalQuery }, maxResults);
 }
 
 /**
@@ -495,33 +427,52 @@ export async function performSemanticSearch(
  */
 export async function aiRerankResults(
     candidates: { thread: EventThread; similarity: number }[],
-    originalQuery: string
+    originalQuery: string,
+    filterTags: string[] = [],
+    filterKeywords: string[] = []
 ): Promise<{ thread: EventThread; similarity: number }[]> {
     if (!LLM_API_KEY || candidates.length === 0) return candidates;
 
+    // 加入分类/标签/关键字信息，帮助 Rerank AI 做决策
     const context = candidates.map((c, i) =>
-        `[ID: ${i}] Title: ${c.thread.title}\nContent: ${c.thread.entries.map(e => e.content).join('; ')}`
+        `[ID: ${i}] 标题: ${c.thread.title} | 分类: ${c.thread.category.name} | 标签: [${c.thread.tags.join(', ')}]\n内容: ${c.thread.entries.map(e => e.content).join('; ')}`
     ).join('\n\n');
 
-    const prompt = `你是一个极度严苛的日记搜索质检员。用户提出了一个具体的问题，你需要审查候选记录是否【直接且明确地】符合问题的主题。
+    const hasStrongConstraints = filterTags.length > 0 || filterKeywords.length > 0;
 
-【绝对剔除准则 - 只要符合一条就剔除】：
-1. 任务状态噪音：如果记录仅仅是描述“我正在做某项办公任务”（如：文案梳理、导表、开会、整理数据源），且并未包含问题所要求的【实质内容】，必须剔除。
-   - 反例：提问“AI心得”，记录“正在梳理AI数据源介绍页文案”。(虽然含AI词，但属于办公状态，无心得，剔除！) 
-2. 语义漂移：如果记录的主题是 A，只是为了描述 A 顺便提到了词汇 B。
-   - 反例：提问“电影”，记录“今天带娃去商场，路过了电影院”。(主题是带娃，剔除！)
-3. 概括模棱两可：如果记录内容太简短，无法确定是否符合要求，请保守剔除。
+    // 配置不同的约束描述
+    const tagConstraint = filterTags.length > 0
+        ? `\n【范围约束】记录必须属于标签/分类 [${filterTags.join(', ')}]。主题不符则剔除。`
+        : '';
+    const keywordConstraint = filterKeywords.length > 0
+        ? `\n【关键词验证】这批记录已由程序字面匹配确认包含 [${filterKeywords.join(', ')}]。请验证记录【确实以此为核心话题】而非只是顺带提到。`
+        : '';
 
-用户原始问题： "${originalQuery}"
+    // 模式切换
+    const strictnessGuide = hasStrongConstraints
+        ? `由于这列结果已经通过了关键词/标签的精确过滤，请采用【宽松留存】原则：只要大方向契合，尽量保留，不要因为内容简短就剔除。`
+        : `由于这列结果仅通过语义向量匹配，请采用【严格质检】原则：只有主旨完全契合的才能留下，宁可错杀不可误留，模糊条目一律剔除。`;
+
+    const prompt = `你是一位资深的日记搜索质检员，你的目标是在结果集中仅保留与用户提问高度契合的瞬间。
+
+${strictnessGuide}${tagConstraint}${keywordConstraint}
+
+【通用剔除判定】：
+1. 记录主体是 A，由于描述 A 偶然带出了查询词 B。
+2. 记录完全是"流水账式"的任务过程记录，不包含实质性的信息。
+
+用户查询："${originalQuery}"
 
 待审核候选结果：
 ${context}
 
-请仅返回真正相关的 ID 数组。宁肯漏掉，绝不误杀。
-返回值格式：{"relevantIds": [0, 2, 5]}`;
+请仅返回相关的记录 ID 数组。
+输出 JSON 格式：{"relevantIds": [0, 1, 2]}`;
 
     try {
         console.group('%c🧠 AI 二次审阅 (Rerank Phase)', 'color: #8e44ad; font-weight: bold;');
+        console.log('[Rerank 模式]:', hasStrongConstraints ? '宽松模式 (Keyword/Tag)' : '严格模式 (Semantic)');
+
         const res = await fetch(LLM_ENDPOINT, {
             method: 'POST',
             headers: {
@@ -548,14 +499,19 @@ ${context}
         const parsed = JSON.parse(rawContent);
         const keepIds: number[] = parsed.relevantIds || [];
 
-        const finalResults = keepIds.map(id => candidates[id]).filter(Boolean);
+        let finalResults = keepIds.map(id => candidates[id]).filter(Boolean);
 
-        console.log('%c[Rerank 策略]:', 'color: #7f8c8d;', '过滤冗余条目，仅保留强相关事实');
+        // EXTRA FALLBACK: 如果命中关键字但 Rerank 全给杀了，说明 AI 审阅尺度可能有误，保底恢复前 5 条结果。
+        if (finalResults.length === 0 && hasStrongConstraints) {
+            console.warn('[Rerank] 判定结果为空，但存在明确关键词要求。启用字面匹配优先级保底，恢复前 5 条。');
+            finalResults = candidates.slice(0, 5);
+        }
+
         console.log('%c[判定结果]:', 'color: #27ae60; font-weight: bold;', `从 ${candidates.length} 条中保留了 ${finalResults.length} 条`);
         if (finalResults.length > 0) {
-            console.table(finalResults.map(r => ({ '最终展示标题': r.thread.title })));
+            console.table(finalResults.map(r => ({ '最终展示标题': r.thread.title, '相似度': r.similarity.toFixed(4) })));
         } else {
-            console.log('%c[Result]: ❌ 无高度匹配内容，已拦截无关显示', 'color: #e74c3c;');
+            console.log('%c[Result]: ❌ 无匹配内容', 'color: #e74c3c;');
         }
         console.groupEnd();
 
@@ -737,6 +693,8 @@ ${eventsText}
 export interface IntentClassificationResult {
     intent: 'SEARCH' | 'RECORD';
     query?: string;
+    tags?: string[];     // 显式提取的标签，如 #工作
+    keywords?: string[]; // 显式提取的关键词
 }
 
 export async function detectUserIntent(content: string): Promise<IntentClassificationResult> {
@@ -746,25 +704,38 @@ export async function detectUserIntent(content: string): Promise<IntentClassific
     if (!LLM_API_KEY || content.trim().length <= 1) return defaultResult;
 
     const prompt = `你是一个用于个人记忆应用的意图路由助手。
-你的任务是分析用户的输入文本，并将其准确分类为 "SEARCH" 或 "RECORD"。
+你的任务是分析用户的输入文本，将其准确分类为 "SEARCH" 或 "RECORD"。
 
 【核心判定逻辑】：
-1. RECORD (记录优先): 这是个人日记应用，默认意图应偏向记录。当用户输入一段包含【具体动作 + 业务对象】的事实时，即便没有使用"已"、"了"，只要它是在陈述一个完成的任务或当下的状态，必须判定为 RECORD。
-   - 示例: "数据源付费墙豁免问题给出方案快速解决大客户问题" -> RECORD (正在记录解决方案)
-   - 示例: "拉通了淘宝生意参谋数据" -> RECORD (记录进度)
-2. SEARCH (搜索判定): 只有当用户明确表现出“回顾”、“提问”或“查找历史”的意图时，才判定为 SEARCH。
-   - 标志: 包含问号 (?)、疑问词（如何、什么、哪里、为什么）、或显性查询动词（查找、查下、搜下、回顾、汇总）。
+1. RECORD (记录优先): 默认意图偏向记录。用户输入含【具体动作 + 业务对象】的事实陈述时，判定为 RECORD。
+   - 示例: "数据源付费墙豁免问题已解决" -> RECORD
+   - 示例: "拉通了淘宝生意参谋数据" -> RECORD
+2. SEARCH: 只有用户明确表现出"回顾/查找历史"意图时，才判定为 SEARCH。
+   - 标志: 包含问号(?)、疑问词（如何、什么、哪里）、或查询动词（查找、搜下、回顾、汇总）。
    - 示例: "付费墙问题是怎么解决的？" -> SEARCH
-   - 示例: "帮我搜下关于大客户的方案" -> SEARCH
+   - 示例: "关于 AI 的内容" -> SEARCH（"关于...的内容/记录"是典型搜索句式）
 
-【Query Refinement (仅针对 SEARCH)】:
-- 如果判定为 SEARCH，请将用户的原始提问转换为提取了核心实体名词的搜索词。
-- 严禁空泛联想，保持检索词的精确性。
+【keywords 提取规则 (仅针对 SEARCH，最关键步骤)】:
+keywords 是用于【硬过滤】的词列表，只有包含这些词的记录才会出现在结果中。
+必须做同义词扩展，避免漏召回：
+- "关于 AI 的内容" -> keywords = ["AI", "大模型", "GPT", "人工智能", "LLM", "Gemini", "Claude", "deepseek"]
+- "公园记录" -> keywords = ["公园", "广场", "户外"]
+- "商业化" -> keywords = ["商业化", "变现", "营收", "付费"]
 
+【tags 提取规则 (仅针对 SEARCH)】:
+- 强烈警告：只有在用户的输入中出现了明确的带有 "#" 号的标签名（例如：用户输入了 "#亲子 关于公园的记录"），你才能将其提取为 tags（如 ["亲子"]）。
+- 如果用户的输入中【没有明确包含 # 号】，即使你觉得它属于某个分类，也【绝对不允许】提取 tags，必须输出 tags: []！不听指令将导致系统崩溃。
 【输出格式】:
-你必须且只能输出一个有效的 JSON 对象：
-{"intent": "RECORD"} 或 {"intent": "SEARCH", "query": "改写后的搜索核心词"}
+你必须且只能输出一个有效的 JSON：
+{"intent": "RECORD"} 或
+{
+  "intent": "SEARCH",
+  "query": "语义搜索描述词（精确，不泛化）",
+  "tags": ["标签1"],
+  "keywords": ["关键词1", "同义词2", "同义词3"]
+}
 不要输出任何其他内容。`;
+
 
     try {
         console.groupCollapsed(`🤖 LLM 意图识别中 (${FAST_MODEL_NAME})...`);
@@ -809,7 +780,12 @@ export async function detectUserIntent(content: string): Promise<IntentClassific
         console.groupEnd();
 
         if (parsed.intent === 'SEARCH') {
-            return { intent: 'SEARCH', query: parsed.query };
+            return {
+                intent: 'SEARCH',
+                query: parsed.query,
+                tags: parsed.tags || [],
+                keywords: parsed.keywords || []
+            };
         }
         return defaultResult;
 

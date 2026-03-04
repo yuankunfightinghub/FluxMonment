@@ -7,7 +7,7 @@ import { InputCapsule, type PendingMedia } from './components/InputCapsule';
 import { MomentStream } from './components/MomentStream';
 import { ViewTabs, type TabValue } from './components/ViewTabs';
 import { DailyMemory } from './components/DailyMemory';
-import { processAndAggregateInput, predictTopicTheme, detectUserIntent, generateEmbedding, performSemanticSearch } from './utils/classificationEngine';
+import { processAndAggregateInput, predictTopicTheme, detectUserIntent, generateEmbedding } from './utils/classificationEngine';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { uploadMedia } from './lib/storage';
 import { isSameDay } from 'date-fns';
@@ -144,21 +144,31 @@ function App() {
       const intentAnalysis = await detectUserIntent(content);
 
       if (intentAnalysis.intent === 'SEARCH') {
-        // --- 拦截并执行语义搜索 ---
-        const query = intentAnalysis.query || content;
-        console.log(`🎯 命中搜索意图！AI 改写后的语义描述为: ${query}`);
+        const { query: aiQuery, tags, keywords } = intentAnalysis;
+        const query = aiQuery || content;
+
+        console.log(`🎯 命中搜索意图！`);
+        console.log(` - 语义查询: ${query}`);
+        if (tags?.length) console.log(` - 标签过滤: ${tags.join(', ')}`);
+        if (keywords?.length) console.log(` - 关键词匹配: ${keywords.join(', ')}`);
+
         setSearchQuery(query);
 
-        const queryEmb = await generateEmbedding(query);
-        if (queryEmb.length > 0) {
-          const matches = await performSemanticSearch(queryEmb, threads, content, 0.45);
-          setSearchResults(matches);
-          setIsSearchMode(true);
-          setActiveTab('moments'); // 强制切回 moments 流以显示结果
-        } else {
-          alert("向量生成失败，请检查网络或配置。");
-        }
+        // 获取语义向量
+        const queryEmb = await (query.trim() ? generateEmbedding(query) : Promise.resolve([]));
 
+        // 执行混合动力搜索
+        const { performHybridSearch } = await import('./utils/classificationEngine');
+        const matches = await performHybridSearch(
+          queryEmb,
+          threads,
+          { query, tags, keywords },
+          15 // maxResults
+        );
+
+        setSearchResults(matches);
+        setIsSearchMode(true);
+        setActiveTab('moments');
         setIsProcessing(false);
         return;
       }
