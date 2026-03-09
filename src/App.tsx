@@ -7,6 +7,7 @@ import { InputCapsule, type PendingMedia } from './components/InputCapsule';
 import { MomentStream } from './components/MomentStream';
 import { ViewTabs, type TabValue } from './components/ViewTabs';
 import { DailyMemory } from './components/DailyMemory';
+import { ExampleCards } from './components/ExampleCards';
 import { processAndAggregateInput, predictTopicTheme, detectUserIntent, generateEmbedding } from './utils/classificationEngine';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { uploadMedia } from './lib/storage';
@@ -27,6 +28,7 @@ function App() {
   const [searchResults, setSearchResults] = useState<{ thread: EventThread; similarity: number }[]>([]);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [memoryDate, setMemoryDate] = useState(new Date());
 
   // ── Media state ────────────────────────────────────────────────────────────
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
@@ -130,6 +132,14 @@ function App() {
     // Wait for any in-flight uploads before submitting
     const stillUploading = pendingMedia.some(pm => pm.uploading);
     if (stillUploading) return;
+
+    // --- 强制登录拦截逻辑 ---
+    // 只要用户未登录，在提交时即刻弹出登录框
+    if (!user) {
+      console.log('Intercepting submit: User must log in.');
+      await signInWithGoogle();
+      return;
+    }
 
     setIsProcessing(true);
     const content = inputValue.trim();
@@ -364,8 +374,12 @@ function App() {
           />
         </div>
 
-        <ViewTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        {/* 仅在登录后显示控制 Tabs */}
+        {user && <ViewTabs activeTab={activeTab} onTabChange={setActiveTab} />}
       </div>
+
+      {/* 未登录时展示精选示例卡片 */}
+      {!user && <ExampleCards />}
 
       {/* Moment stream */}
       <div style={{ width: '100%', maxWidth: '1200px' }}>
@@ -475,7 +489,9 @@ function App() {
           />
         ) : (
           <DailyMemory
-            todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, new Date()))}
+            selectedDate={memoryDate}
+            onDateChange={setMemoryDate}
+            todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, memoryDate))}
             onDeleteEntry={deleteEntry}
           />
         )}

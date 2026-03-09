@@ -5,20 +5,54 @@ import {
     ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import admin from 'firebase-admin';
-import { readFileSync } from 'fs';
+import { readFileSync, appendFileSync } from 'fs';
 import * as dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import fetch from 'node-fetch';
 import { buildSharedPrompt, parseLLMResponse } from '../../src/utils/aiLogicCore.js';
 import type { EventThread } from '../../src/types.js';
 
-// load .env file
-dotenv.config();
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// 强制调试日志函数：将关键信息写入物理文件，防止 Stdio 无法直接观察的问题
+function debugLog(message: string) {
+    const logPath = join('/tmp/mcp_debug.log');
+    const time = new Date().toISOString();
+    try {
+        appendFileSync(logPath, `[${time}] ${message}\n`);
+    } catch (e) {
+        // ignore
+    }
+}
+
+// 尝试在不同层级寻找 .env
+const possibleEnvPaths = [
+    join(__dirname, '../../../.env'), // 从 dist/mcp-server/src 向上 3 级（推荐）
+    join(__dirname, '../../.env'),    // 向上 2 级
+    join(process.cwd(), '.env'),      // 当前执行目录
+    join(process.cwd(), 'mcp-server/.env') // 父执行目录
+];
+
+for (const p of possibleEnvPaths) {
+    const result = dotenv.config({ path: p });
+    if (result.parsed) {
+        debugLog(`Environment loaded from: ${p}`);
+        break;
+    }
+}
+
+debugLog(`MCP Startup: APP_ID=${process.env.APP_ID}, USER_UID=${process.env.USER_UID}`);
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+    debugLog("FATAL: FIREBASE_SERVICE_ACCOUNT_PATH is missing from env!");
+}
 
 // Initialize Firebase Admin SDK
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 if (!serviceAccountPath) {
-    console.error("FIREBASE_SERVICE_ACCOUNT_PATH is not set in .env");
     process.exit(1);
 }
 
@@ -115,19 +149,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (request.params.name === "add_moment") {
         const { content } = request.params.arguments as { content: string };
         const timestamp = Date.now();
+        debugLog(`Tool add_moment invoked. Content length: ${content.length}`);
 
         try {
-            // 0. Get context (last hour of threads for merging)
-            const momentsCol = db.collection('artifacts').doc(APP_ID).collection('users').doc(USER_UID).collection('moments');
-            const snapshot = await momentsCol.orderBy('lastUpdatedAt', 'desc').limit(10).get();
-            const existingThreads = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+            // 0. Get context
+            const currentAppId = process.env.APP_ID || APP_ID;
+            const currentUserUid = process.env.USER_UID || USER_UID;
+            const momentsPath = `artifacts/${currentAppId}/users/${currentUserUid}/moments`;
 
-            // 1. Process via same AI Logic as Web
+            debugLog(`Paths: APP_ID=${currentAppId}, User=${currentUserUid}`);
+            debugLog(`Firestore target: ${momentsPath}`);
+
+            const snapshot = await db.collection(momentsPath).orderBy('lastUpdatedAt', 'desc').limit(10).get();
+            const existingThreads = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+            debugLog(`Retrieved ${existingThreads.length} existing threads.`);
+
+            // 1. Process via AI
+            debugLog(`Analyzing with AI... (Endpoint: ${process.env.VITE_LLM_ENDPOINT || 'default'})`);
             const classification = await analyzeWithAI(content, existingThreads);
+            debugLog(`AI Analysis result: Title=[${classification.title}], MatchedID=[${classification.matchedThreadId}]`);
 
             // Handle merging if matched
             if (classification.matchedThreadId) {
-                const threadRef = momentsCol.doc(classification.matchedThreadId);
+                const threadRef = db.doc(`${momentsPath}/${classification.matchedThreadId}`);
                 const threadDoc = await threadRef.get();
                 if (threadDoc.exists) {
                     const data = threadDoc.data()!;
@@ -170,7 +214,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 ]
             };
 
-            await momentsCol.doc(momentId).set(threadData);
+            debugLog(`Writing new moment to Firestore doc: ${momentId}`);
+            await db.doc(`${momentsPath}/${momentId}`).set(threadData);
+            debugLog(`Write to Firestore SUCCESS.`);
 
             return {
                 content: [
@@ -180,13 +226,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     },
                 ],
             };
-        } catch (error) {
+        } catch (error: any) {
+            debugLog(`CRITICAL ERROR in add_moment: ${error?.message || error}`);
+            if (error?.stack) debugLog(`Stack: ${error.stack}`);
             return {
                 isError: true,
                 content: [
                     {
                         type: "text",
-                        text: `Failed to add moment to Firestore: ${error}`,
+                        text: `Failed to add moment to Firestore: ${error?.message || error}`,
                     },
                 ],
             };

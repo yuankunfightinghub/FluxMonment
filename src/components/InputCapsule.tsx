@@ -53,7 +53,8 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
     }, [value]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        // 修改为 Cmd + Enter (Mac) 或 Ctrl + Enter (Win) 提交
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             if (value.trim() || pendingMedia.length > 0) {
                 onSubmit();
@@ -260,6 +261,7 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
                         whileTap={{ scale: hasContent ? 0.92 : 1 }}
                         onClick={onSubmit}
                         disabled={isLoading || !hasContent}
+                        title={hasContent ? '发送 (Cmd + Enter)' : ''}
                         style={{
                             width: '32px',
                             height: '32px',

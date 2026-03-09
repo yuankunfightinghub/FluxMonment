@@ -1,27 +1,55 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Circle, Plus, RefreshCw, X } from 'lucide-react';
+import {
+    CheckCircle2, Circle, Plus, RefreshCw, X, FileText, Save, Edit3, Loader2, Copy, Check,
+    Calendar, ChevronLeft, ChevronRight
+} from 'lucide-react';
 import type { EventThread, DailyMemoryData, TimelineEntry, EndOfDayTask } from '../types';
-import { generateDailySummary } from '../utils/classificationEngine';
+import { generateDailySummary, generateWorkSummary } from '../utils/classificationEngine';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { MediaMosaic } from './MediaMosaic';
 
 interface DailyMemoryProps {
     todayThreads: EventThread[];
+    selectedDate: Date;
+    onDateChange: (date: Date) => void;
     onDeleteEntry?: (threadId: string, entryId: string) => void;
 }
 
-export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDeleteEntry }) => {
+export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selectedDate, onDateChange, onDeleteEntry }) => {
     const [data, setData] = useState<DailyMemoryData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [tasks, setTasks] = useState<EndOfDayTask[]>([]);
     const [newTaskText, setNewTaskText] = useState('');
+    const [workSummary, setWorkSummary] = useState<string>('');
+    const [isGeneratingWorkSummary, setIsGeneratingWorkSummary] = useState(false);
+    const [isEditingWorkSummary, setIsEditingWorkSummary] = useState(false);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
-    const now = new Date();
-    const bigDay = format(now, 'dd');
-    const monthYear = format(now, 'MMM yyyy');
-    const dateContext = format(now, 'yyyy年MM月dd日', { locale: zhCN });
+    const bigDay = format(selectedDate, 'dd');
+    const monthYear = format(selectedDate, 'MMM yyyy');
+    const dateContext = format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN });
+
+    // Date navigation
+    const handlePrevDay = () => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() - 1);
+        onDateChange(d);
+    };
+
+    const handleNextDay = () => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + 1);
+        onDateChange(d);
+    };
+
+    const handleDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.value) {
+            onDateChange(new Date(e.target.value));
+        }
+    };
 
     // Generate a fingerprint based on today's threads
     const threadCount = todayThreads.length;
@@ -42,6 +70,13 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDelete
                     if (parsedCache.fingerprint === cacheFingerprint && parsedCache.data) {
                         setData(parsedCache.data);
                         setTasks(parsedCache.data.tasks || []);
+
+                        // Also check for cached work summary
+                        const cachedWorkSummary = localStorage.getItem(`work_summary_${dateContext}`);
+                        if (cachedWorkSummary) {
+                            setWorkSummary(cachedWorkSummary);
+                        }
+
                         setIsLoading(false);
                         return;
                     }
@@ -64,6 +99,32 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDelete
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleGenerateWorkSummary = async () => {
+        setIsGeneratingWorkSummary(true);
+        try {
+            const summary = await generateWorkSummary(todayThreads, dateContext);
+            setWorkSummary(summary);
+            localStorage.setItem(`work_summary_${dateContext}`, summary);
+        } catch (err) {
+            console.error('Failed to generate work summary:', err);
+        } finally {
+            setIsGeneratingWorkSummary(false);
+        }
+    };
+
+    const handleSaveWorkSummary = () => {
+        localStorage.setItem(`work_summary_${dateContext}`, workSummary);
+        setIsEditingWorkSummary(false);
+    };
+
+    const handleCopyWorkSummary = () => {
+        if (!workSummary) return;
+        navigator.clipboard.writeText(workSummary).then(() => {
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        });
     };
 
     useEffect(() => {
@@ -269,17 +330,34 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDelete
                     flexDirection: 'column',
                     gap: '32px'
                 }}>
-                    {/* Part 1: Date & AI Header (Reverted to centered) */}
-                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%', marginBottom: '32px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
+                    {/* Part 1: Date & AI Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: '16px', gap: '32px' }}>
+                        <motion.button
+                            whileHover={{ scale: 1.1, backgroundColor: 'rgba(0,0,0,0.03)' }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={handlePrevDay}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '12px', borderRadius: '50%' }}
+                        >
+                            <ChevronLeft size={32} />
+                        </motion.button>
+
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
                             <h1 style={{
                                 fontSize: '84px', fontWeight: 600, letterSpacing: '-0.02em', margin: 0,
                                 color: 'var(--text-strong)',
                                 fontFamily: 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"',
                                 lineHeight: 1, fontStyle: 'italic',
-                            }}>
+                                cursor: 'pointer'
+                            }} onClick={() => document.getElementById('date-picker-input')?.click()}>
                                 {bigDay}
                             </h1>
+                            <input
+                                id="date-picker-input"
+                                type="date"
+                                onChange={handleDateInput}
+                                value={format(selectedDate, 'yyyy-MM-dd')}
+                                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', top: '50%', left: '50%' }}
+                            />
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingBottom: '10px' }}>
                                 <span style={{
                                     fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600,
@@ -327,6 +405,15 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDelete
                                 </div>
                             </div>
                         </div>
+
+                        <motion.button
+                            whileHover={{ scale: 1.1, backgroundColor: 'rgba(0,0,0,0.03)' }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={handleNextDay}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '12px', borderRadius: '50%' }}
+                        >
+                            <ChevronRight size={32} />
+                        </motion.button>
                     </div>
 
                     {/* Part 2: Daily Summary (Reverted to centered text) */}
@@ -655,6 +742,255 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, onDelete
                     </div>
                 )}
             </div>
-        </motion.div>
+
+            {/* Floating Report Button */}
+            <div style={{ position: 'fixed', bottom: '40px', right: '40px', zIndex: 100 }}>
+                <motion.button
+                    whileHover={{ scale: 1.05, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsReportModalOpen(true)}
+                    style={{
+                        width: '56px', height: '56px', borderRadius: '28px',
+                        background: 'rgba(5, 5, 5, 0.9)', color: 'white',
+                        border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)'
+                    }}
+                    title="生成今日工作汇报"
+                >
+                    <FileText size={24} />
+                </motion.button>
+            </div>
+
+            {/* Work Summary Modal Overlay */}
+            <AnimatePresence>
+                {isReportModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'fixed', inset: 0, zIndex: 1000,
+                            background: 'rgba(255, 255, 255, 0.8)',
+                            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            padding: '40px'
+                        }}
+                        onClick={() => !isEditingWorkSummary && setIsReportModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            style={{
+                                width: '100%', maxWidth: '900px', height: '90vh',
+                                background: 'white', borderRadius: '24px',
+                                border: '1px solid rgba(0,0,0,0.05)',
+                                boxShadow: '0 30px 60px rgba(0,0,0,0.12)',
+                                display: 'flex', flexDirection: 'column',
+                                overflow: 'hidden'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div style={{
+                                padding: '24px 32px', borderBottom: '1px solid rgba(0,0,0,0.05)',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                background: 'rgba(0,0,0,0.01)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ padding: '8px', borderRadius: '8px', background: 'rgba(5, 5, 5, 0.05)' }}>
+                                        <FileText size={20} color="#050505" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#050505' }}>
+                                            今日工作成果汇报
+                                        </h2>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                            AI 驱动的工作总结 · 针对汇报优化
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                    {!workSummary && !isGeneratingWorkSummary && (
+                                        <button
+                                            onClick={handleGenerateWorkSummary}
+                                            style={{
+                                                padding: '8px 16px', borderRadius: '8px',
+                                                background: '#050505', color: 'white',
+                                                border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 500,
+                                                display: 'flex', alignItems: 'center', gap: '8px'
+                                            }}
+                                        >
+                                            <Loader2 size={16} /> 开始生成
+                                        </button>
+                                    )}
+
+                                    {workSummary && !isEditingWorkSummary && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.02, backgroundColor: 'rgba(5, 5, 5, 0.05)' }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => setIsEditingWorkSummary(true)}
+                                            style={{
+                                                padding: '8px 16px', borderRadius: '8px',
+                                                background: 'white', color: '#050505',
+                                                border: '1px solid #050505', cursor: 'pointer', fontSize: '14px',
+                                                fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px'
+                                            }}
+                                        >
+                                            <Edit3 size={14} /> 编辑汇报
+                                        </motion.button>
+                                    )}
+
+                                    {isEditingWorkSummary && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.02, backgroundColor: '#222' }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={handleSaveWorkSummary}
+                                            style={{
+                                                padding: '8px 16px', borderRadius: '8px',
+                                                background: '#050505', color: 'white',
+                                                border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 500,
+                                                display: 'flex', alignItems: 'center', gap: '6px'
+                                            }}
+                                        >
+                                            <Save size={14} /> 保存修改
+                                        </motion.button>
+                                    )}
+
+                                    {workSummary && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.02, backgroundColor: 'rgba(5, 5, 5, 0.05)' }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={handleGenerateWorkSummary}
+                                            disabled={isGeneratingWorkSummary}
+                                            style={{
+                                                padding: '8px 16px', borderRadius: '8px',
+                                                background: 'white', color: '#050505',
+                                                border: '1px solid #050505', cursor: 'pointer', fontSize: '14px',
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                opacity: isGeneratingWorkSummary ? 0.5 : 1,
+                                                fontWeight: 500
+                                            }}
+                                        >
+                                            <RefreshCw size={14} className={isGeneratingWorkSummary ? 'animate-spin' : ''} />
+                                            重新提取内容
+                                        </motion.button>
+                                    )}
+
+                                    {workSummary && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.02, backgroundColor: 'rgba(5, 5, 5, 0.05)' }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={handleCopyWorkSummary}
+                                            style={{
+                                                padding: '8px 16px', borderRadius: '8px',
+                                                background: isCopied ? 'rgba(34, 197, 94, 0.1)' : 'white',
+                                                color: isCopied ? '#16a34a' : '#050505',
+                                                border: `1px solid ${isCopied ? '#16a34a' : '#050505'}`,
+                                                cursor: 'pointer', fontSize: '14px',
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                fontWeight: 500,
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                                            {isCopied ? '复制成功' : '一键复制内容'}
+                                        </motion.button>
+                                    )}
+
+                                    <button
+                                        onClick={() => setIsReportModalOpen(false)}
+                                        style={{
+                                            padding: '8px', borderRadius: '8px',
+                                            background: 'transparent', color: 'var(--text-muted)',
+                                            border: 'none', cursor: 'pointer'
+                                        }}
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Modal Content */}
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '40px 60px' }}>
+                                {isGeneratingWorkSummary && !workSummary && (
+                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '16px' }}>
+                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }}>
+                                            <Loader2 size={32} color="var(--color-primary)" />
+                                        </motion.div>
+                                        <div style={{ fontSize: '16px', color: '#050505', fontWeight: 500 }}>深度挖掘今日记忆中...</div>
+                                        <div style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '300px' }}>
+                                            AI 正在按产品线分类、提取关键结果并评估风险。
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!isGeneratingWorkSummary && !workSummary && (
+                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '20px' }}>
+                                        <div style={{ padding: '24px', borderRadius: '30px', background: 'rgba(0,0,0,0.02)' }}>
+                                            <FileText size={48} color="rgba(0,0,0,0.1)" />
+                                        </div>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <h3 style={{ margin: '0 0 8px', fontSize: '18px', color: '#050505' }}>准备好一份专业汇报</h3>
+                                            <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)', maxWidth: '400px' }}>
+                                                点击上方“开始生成”按钮，AI 将根据您今日在“商业化、数据连接、表格、插件”等方面的点滴记录，整合出一份高水准的工作总结。
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {workSummary && isEditingWorkSummary ? (
+                                    <textarea
+                                        value={workSummary}
+                                        onChange={(e) => setWorkSummary(e.target.value)}
+                                        style={{
+                                            width: '100%', height: '100%', minHeight: '500px',
+                                            padding: '20px', borderRadius: '12px',
+                                            border: '1px solid var(--border-default)',
+                                            background: 'rgba(0,0,0,0.01)',
+                                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                            fontSize: '15px', lineHeight: 1.7,
+                                            outline: 'none', resize: 'none'
+                                        }}
+                                        placeholder="在这里修改您的汇报内容..."
+                                    />
+                                ) : workSummary ? (
+                                    <div style={{
+                                        fontSize: '16px', lineHeight: 1.8, color: '#333',
+                                        whiteSpace: 'pre-wrap',
+                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                                    }}>
+                                        {workSummary}
+
+                                        {isGeneratingWorkSummary && (
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                style={{ marginTop: '20px', color: 'var(--color-primary)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                            >
+                                                <Loader2 size={14} className="animate-spin" /> 正在更新内容...
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div style={{
+                                padding: '16px 32px', borderTop: '1px solid rgba(0,0,0,0.05)',
+                                display: 'flex', justifyContent: 'center', background: 'rgba(0,0,0,0.01)'
+                            }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                    提示：报告将自动保存至浏览器预览，支持手动点击按钮复制到 DingTalk 或其他汇报工具。
+                                </span>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div >
     );
 };

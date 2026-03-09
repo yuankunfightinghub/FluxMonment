@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, APP_ID } from '../lib/firebase';
 import type { EventThread } from '../types';
+const LOCAL_STORAGE_KEY = `fluxmoment_local_moments_${APP_ID}`;
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -47,6 +48,14 @@ export function useFirestoreSync() {
     useEffect(() => {
         if (!auth) {
             // Firebase not configured — local-only mode
+            const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (localData) {
+                try {
+                    setThreads(JSON.parse(localData));
+                } catch (e) {
+                    console.error('[LocalStorage] Failed to parse:', e);
+                }
+            }
             setIsAuthChecked(true);
             return;
         }
@@ -56,12 +65,38 @@ export function useFirestoreSync() {
             setIsAuthChecked(true);
 
             if (firebaseUser) {
+                // 登录后，尝试将本地数据同步到云端
+                const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (localData) {
+                    try {
+                        const localThreads: EventThread[] = JSON.parse(localData);
+                        if (localThreads.length > 0) {
+                            console.log('[Auth] Syncing local moments to cloud...');
+                            syncLocalToCloud(firebaseUser.uid, localThreads);
+                            // 同步后清除本地缓存，防止重复同步
+                            localStorage.removeItem(LOCAL_STORAGE_KEY);
+                        }
+                    } catch (e) {
+                        console.error('[Auth] Local sync failed:', e);
+                    }
+                }
                 attachListener(firebaseUser.uid);
             } else {
                 // User signed out — tear down listener and clear cards
                 unsubSnapshotRef.current?.();
                 unsubSnapshotRef.current = null;
-                setThreads([]);
+
+                // 加载本地缓存数据
+                const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (localData) {
+                    try {
+                        setThreads(JSON.parse(localData));
+                    } catch (e) {
+                        setThreads([]);
+                    }
+                } else {
+                    setThreads([]);
+                }
             }
         });
 
@@ -108,6 +143,23 @@ export function useFirestoreSync() {
         unsubSnapshotRef.current = unsub;
     }
 
+    // ── Internal Sync ────────────────────────────────────────────────────────
+    async function syncLocalToCloud(uid: string, localThreads: EventThread[]) {
+        if (!db) return;
+        const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+
+        // 遍历本地数据写入云端
+        const writes = localThreads.map(thread => {
+            const ref = doc(momentsCol, thread.id);
+            return setDoc(ref, {
+                ...thread,
+                _syncedFromLocalAt: serverTimestamp()
+            });
+        });
+        await Promise.all(writes);
+        console.log(`[Auth] Sync completed: ${localThreads.length} moments moved.`);
+    }
+
     // ── Auth actions ─────────────────────────────────────────────────────────
     async function signInWithGoogle() {
         if (!auth) return;
@@ -140,7 +192,13 @@ export function useFirestoreSync() {
         setThreads(sorted);
 
         const uid = user?.uid;
-        if (!db || !uid) return;
+        if (!uid) {
+            // Save to LocalStorage if not logged in
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sorted));
+            return;
+        }
+
+        if (!db) return;
 
         const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
 
@@ -174,10 +232,18 @@ export function useFirestoreSync() {
 
     async function deleteMoment(threadId: string, thread: EventThread) {
         const uid = user?.uid;
-        if (!db || !uid) return;
 
         // Optimistic delete
-        setThreads(prev => prev.filter(t => t.id !== threadId));
+        const remainingThreads = threads.filter(t => t.id !== threadId);
+        setThreads(remainingThreads);
+
+        if (!uid) {
+            // Not logged in — update local storage
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remainingThreads));
+            return;
+        }
+
+        if (!db) return;
 
         try {
             // 1. Delete all attached media from Storage
@@ -200,7 +266,15 @@ export function useFirestoreSync() {
 
     async function clearAllMoments() {
         const uid = user?.uid;
-        if (!db || !uid) return;
+
+        if (!uid) {
+            // Not logged in — clear local storage
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            setThreads([]);
+            return;
+        }
+
+        if (!db) return;
 
         const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
         try {
