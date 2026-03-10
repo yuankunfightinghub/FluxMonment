@@ -288,9 +288,36 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
                         marginTop: isHovered ? '12px' : '0',
                         transition: 'max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease'
                     }}>
-                        <div style={{ fontSize: '13px', color: '#555', lineHeight: 1.5, marginBottom: hasMedia ? '8px' : 0 }}>
+                        <div style={{ fontSize: '13px', color: '#555', lineHeight: 1.5, marginBottom: (hasMedia || (item.thread.tags && item.thread.tags.length > 0)) ? '12px' : 0 }}>
                             {item.entry.content}
                         </div>
+
+                        {/* AI extracted keyword tags */}
+                        {item.thread.tags && item.thread.tags.length > 0 && (
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '6px',
+                                marginBottom: hasMedia ? '12px' : 0,
+                            }}>
+                                {item.thread.tags.map((tag, i) => (
+                                    <span
+                                        key={i}
+                                        style={{
+                                            fontSize: '11px',
+                                            fontWeight: 500,
+                                            color: themeColor,
+                                            background: isWork ? 'rgba(5, 5, 5, 0.05)' : 'rgba(211, 84, 0, 0.1)',
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            letterSpacing: '0.01em',
+                                        }}
+                                    >
+                                        {tag.startsWith('#') ? tag : `#${tag}`}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Media Mosaic on Expand */}
                         {hasMedia && (

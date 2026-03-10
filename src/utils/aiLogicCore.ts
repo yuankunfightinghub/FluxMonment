@@ -1,4 +1,4 @@
-import type { EventThread, EventCategory, TimelineEntry, MoodType } from '../types.js';
+import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType, DailyMemoryData } from '../types.js';
 
 /**
  * 核心 AI 逻辑配置文件 - 供 Web 前端与 MCP Server 共用
@@ -12,6 +12,7 @@ export interface LLMAnalysisResult {
     tags: string[];
     mood: MoodType;
     avatarVariant: number;
+    inputNature: 'FACT' | 'MOOD' | 'NOISE';
 }
 
 /**
@@ -27,12 +28,16 @@ export function buildSharedPrompt(content: string, existingThreads: EventThread[
     return `你是一个个人时刻记录助手，负责分析用户输入并返回严格的 JSON。请执行以下【输入分级策略】与【逻辑提取】：
 
 ### 第一步：判定输入评级 (Internal Grading)
-- **Grade A (核心事实)**: 包含明确动作、对象或成果。如：“解决XX问题”、“完成XX部署”。
-- **Grade B (碎碎念/情感)**: 描述心情、琐事或感悟。如：“今天好累”、“想去旅行”。
+- **Grade A (核心事实/业务)**: 包含明确动作、对象、成果或技术处理。如：“解决XX问题”、“完成XX技术对接”。
+- **Grade B (心情/碎碎念/生活细节)**: 描述心情、琐事、感悟或生活片段。如：“今天好累”、“想去旅行”、“计划没做完”。
 - **Grade C (无效/噪声)**: 极短、符号、乱码或测试词。如：“...”、“123”。
 
-### 第二步：提取规则 (Strict Rule)
-1. **Grade A 极简公式**: 标题 = [核心实体 + 状态]。必须剔除“问题”、“解决”、“任务”、“进行”、“完成”等冗余动向词。
+### 第二步：逻辑提取与性质判定 (Logic & Nature)
+1. **记录性质判定 (inputNature)**:
+   - 核心事实或具体业务处理 -> **"FACT"**
+   - 个人心情、感悟或感性生活记录 -> **"MOOD"**
+   - Grade C 类 -> **"NOISE"**
+2. ** Grade A 极简公式**: 标题 = [核心实体 + 状态]。必须剔除“问题”、“解决”、“任务”、“进行”、“完成”等冗余动向词。
    - 范例：“数据源付费墙豁免问题已解决” -> **“付费墙豁免”**
    - 范例：“完成商业化弹窗验收” -> **“弹窗验收”**
 2. **Grade B 感性公式**: 标题使用具象描述短句，侧重情感表达。
@@ -48,7 +53,8 @@ export function buildSharedPrompt(content: string, existingThreads: EventThread[
   "tags": ["核心标签1", "核心标签2"],
   "mood": "从以下选一：happy, excited, proud, playful, curious, focused, calm, cozy, tired, adventurous",
   "avatarVariant": 22,
-  "matchedThreadId": "历史 id 或 null（极其严格：若当前输入与历史卡片的具体业务主体、功能点、特定对象发生任何偏移，必须返回 null。严禁仅因共享‘数据源’、‘AI’等通用关键词而合并！）"
+  "inputNature": "FACT 或 MOOD 或 NOISE",
+  "matchedThreadId": "历史 id 或 null（极其严格：若当前输入与历史卡片的性质(Nature)不同，必须返回 null。也严禁仅因共享‘数据源’、‘AI’等通用关键词而合并！）"
 }
 
 【图标分发指南 (avatarVariant 小图标数字 0-49)】:
@@ -98,6 +104,7 @@ export function parseLLMResponse(raw: string, originalContent: string, existingT
     const title = String(parsed.title ?? '生活记录');
     const tags: string[] = Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5).map(String) : [];
     const mood = (parsed.mood as MoodType) ?? 'calm';
+    const inputNature = (parsed.inputNature as 'FACT' | 'MOOD' | 'NOISE') ?? (category.theme === 'cyber-blue' ? 'FACT' : 'MOOD');
     const matchedThreadId = typeof parsed.matchedThreadId === 'string' ? parsed.matchedThreadId : null;
 
     // 优先使用 AI 返回的图标，如果没有则根据分类哈希一个
@@ -121,5 +128,6 @@ export function parseLLMResponse(raw: string, originalContent: string, existingT
         tags,
         mood,
         avatarVariant: avatarVariantNum,
+        inputNature,
     };
 }

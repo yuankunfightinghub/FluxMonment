@@ -1,4 +1,4 @@
-import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType, DailyMemoryData } from '../types.js';
+import type { EventThread, EventCategory, MoodType, DailyMemoryData, MediaAttachment } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 import { buildSharedPrompt, parseLLMResponse, pickAvatarVariant } from './aiLogicCore.js';
 
@@ -12,6 +12,7 @@ interface LLMAnalysisResult {
     tags: string[];      // AI-extracted keyword tags, max 5
     mood: MoodType;      // emotional tone
     avatarVariant: number; // 0-49
+    inputNature: 'FACT' | 'MOOD' | 'NOISE';
 }
 
 /**
@@ -150,15 +151,15 @@ function regexFallback(content: string, existingThreads: EventThread[]): LLMAnal
     let category: EventCategory = { name: '生活杂记', theme: 'sunset-orange' };
     let title = '生活记录';
     const isLifePriority = /(孩子|宝宝|女儿|儿子|亲子|小朋友|带娃|给娃|照顾|陪)/.test(text);
-    const isWorkKeyword = /(需求|方案|产品|运营|互联网|开会|汇报|进度|工作|设计|评审|上线|迭代|测试|大模型|商业化|数据|接口|增长|用户|发布)/.test(text);
+    const isWorkKeyword = /(需求|方案|设计|评审|上线|迭代|测试|bug|代码|安卓|ios|pad|沟通|处理|识别|修复|脚本|调研|反馈|对接|大模型|商业化|数据|接口|增长|用户|发布|开会|汇报|进度|工作)/.test(text);
 
     // 即使有工作关键词，只要有强生活意图词，也判定为生活
     const isWork = isWorkKeyword && !isLifePriority;
 
     if (isWork) {
         category.theme = 'cyber-blue';
-        if (/(开会|评审|汇报|对齐|讨论|同步)/.test(text)) { category.name = '会议与沟通'; title = '工作协同与会议'; }
-        else if (/(需求|方案|设计|迭代|上线|产品|prd)/.test(text)) { category.name = '产品与方案'; title = '产品推进记录'; }
+        if (/(开会|评审|汇报|对齐|讨论|同步|沟通|协作)/.test(text)) { category.name = '会议与沟通'; title = '工作协同与会议'; }
+        else if (/(需求|方案|设计|迭代|上线|产品|prd|调研|技术方案|处理|识别|修复)/.test(text)) { category.name = '产品与方案'; title = '产品推进记录'; }
         else if (/(运营|增长|dau|留存|转化|活动)/.test(text)) { category.name = '运营增长'; title = '运营动作记录'; }
         else { category.name = '日常工作'; title = '日常事务办理'; }
     } else {
@@ -171,18 +172,21 @@ function regexFallback(content: string, existingThreads: EventThread[]): LLMAnal
     const tags = extractTags(text, isWork);
     const mood = detectMood(text, isWork);
     const avatarVariant = pickAvatarVariant(text, category.name);
+    const inputNature: 'FACT' | 'MOOD' | 'NOISE' = isWork ? 'FACT' : (isLifePriority ? 'MOOD' : (/(开心|快乐|难过|累|计划|碎碎念|心情)/.test(text) ? 'MOOD' : 'MOOD'));
+
     const ONE_HOUR_MS = 60 * 60 * 1000;
     const now = Date.now();
     let matchedThreadId: string | null = null;
     let matchedThreadTitle = title;
     for (const thread of existingThreads) {
+        // 关键修复：除了分类和时间，还需检查记录性质（隐含在 theme 中，或后续通过 AI 判定）
         if (thread.category.name === category.name && now - thread.lastUpdatedAt <= ONE_HOUR_MS) {
             matchedThreadId = thread.id;
             matchedThreadTitle = thread.title;
             break;
         }
     }
-    return { matchedThreadId, title: matchedThreadTitle, category, tags, mood, avatarVariant };
+    return { matchedThreadId, title: matchedThreadTitle, category, tags, mood, avatarVariant, inputNature };
 }
 
 /**
@@ -257,22 +261,35 @@ export async function processAndAggregateInput(
     let highlightThreadId = '';
 
     if (analysis.matchedThreadId) {
-        updatedThreads = updatedThreads.map(thread => {
-            if (thread.id === analysis.matchedThreadId) {
-                // Merge tags — keep parent tags + any new unique ones, cap at 5
-                const mergedTags = [...new Set([...thread.tags, ...analysis.tags])].slice(0, 5);
-                return {
-                    ...thread,
-                    entries: [...thread.entries, newEntry],
-                    tags: mergedTags,
-                    mood: analysis.mood,
-                    lastUpdatedAt: Date.now()
-                };
-            }
-            return thread;
-        });
-        highlightThreadId = analysis.matchedThreadId;
-    } else {
+        // 进一步校验 matchedThreadId 的性质是否一致，防止异质记录误合并（AI 判定可能仍有漏网之鱼）
+        const targetThread = updatedThreads.find(t => t.id === analysis.matchedThreadId);
+        const threadNature = (targetThread?.category.theme === 'cyber-blue') ? 'FACT' : 'MOOD';
+
+        const shouldMerge = (analysis.inputNature === 'NOISE') || (analysis.inputNature === threadNature);
+
+        if (shouldMerge) {
+            updatedThreads = updatedThreads.map(thread => {
+                if (thread.id === analysis.matchedThreadId) {
+                    // Merge tags — keep parent tags + any new unique ones, cap at 5
+                    const mergedTags = [...new Set([...thread.tags, ...analysis.tags])].slice(0, 5);
+                    return {
+                        ...thread,
+                        entries: [...thread.entries, newEntry],
+                        tags: mergedTags,
+                        mood: analysis.mood,
+                        lastUpdatedAt: Date.now()
+                    };
+                }
+                return thread;
+            });
+            highlightThreadId = analysis.matchedThreadId;
+        } else {
+            // 性质不符，强制创建新 Thread
+            analysis.matchedThreadId = null;
+        }
+    }
+
+    if (!analysis.matchedThreadId) {
         const newThread: EventThread = {
             id: uuidv4(),
             title: analysis.title,
