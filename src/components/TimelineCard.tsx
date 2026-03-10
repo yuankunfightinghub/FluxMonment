@@ -266,7 +266,7 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                                     letterSpacing: '0.01em',
                                 }}
                             >
-                                {tag}
+                                {tag.startsWith('#') ? tag : `#${tag}`}
                             </span>
                         ))}
                     </div>
