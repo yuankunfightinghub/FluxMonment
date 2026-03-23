@@ -306,8 +306,8 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
                                         style={{
                                             fontSize: '11px',
                                             fontWeight: 500,
-                                            color: isWork ? '#e11d48' : themeColor,
-                                            background: isWork ? 'rgba(225, 29, 72, 0.1)' : 'rgba(211, 84, 0, 0.1)',
+                                            color: isWork ? '#4d7c0f' : themeColor,
+                                            background: isWork ? 'rgba(77, 124, 15, 0.15)' : 'rgba(211, 84, 0, 0.1)',
                                             padding: '2px 8px',
                                             borderRadius: '4px',
                                             letterSpacing: '0.01em',
