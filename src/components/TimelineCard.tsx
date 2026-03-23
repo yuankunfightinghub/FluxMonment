@@ -259,8 +259,8 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                                 style={{
                                     fontSize: '12px',
                                     fontWeight: 500,
-                                    color: isWork ? '#4d7c0f' : accentColor,
-                                    background: isWork ? 'rgba(77, 124, 15, 0.15)' : accentBg,
+                                    color: isWork ? '#059669' : accentColor,
+                                    background: isWork ? 'rgba(16, 185, 129, 0.15)' : accentBg,
                                     padding: '4px 10px',
                                     borderRadius: '24px',
                                     letterSpacing: '0.01em',

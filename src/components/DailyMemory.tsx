@@ -155,17 +155,40 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
         return items.sort((a, b) => a.entry.timestamp - b.entry.timestamp);
     }, [todayThreads]);
 
+    const updateCacheTasks = (newTasks: any[]) => {
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+            try {
+                const parsedCache = JSON.parse(cachedRaw);
+                if (parsedCache.data) {
+                    parsedCache.data.tasks = newTasks;
+                    localStorage.setItem(cacheKey, JSON.stringify(parsedCache));
+                }
+            } catch (e) {
+                console.error('Failed to update task cache:', e);
+            }
+        }
+    };
+
     const toggleTask = (id: string) => {
-        setTasks(prev => prev.map(t => t.id === id ? { ...t, isCompleted: !t.isCompleted } : t));
+        setTasks(prev => {
+            const next = prev.map(t => t.id === id ? { ...t, isCompleted: !t.isCompleted } : t);
+            updateCacheTasks(next);
+            return next;
+        });
     };
 
     const addTask = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && newTaskText.trim()) {
-            setTasks(prev => [...prev, {
-                id: Math.random().toString(36).slice(2),
-                content: newTaskText.trim(),
-                isCompleted: false
-            }]);
+            setTasks(prev => {
+                const next = [...prev, {
+                    id: Math.random().toString(36).slice(2),
+                    content: newTaskText.trim(),
+                    isCompleted: false
+                }];
+                updateCacheTasks(next);
+                return next;
+            });
             setNewTaskText('');
         }
     };
@@ -307,8 +330,8 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
                                         style={{
                                             fontSize: '11px',
                                             fontWeight: 500,
-                                            color: isWork ? '#4d7c0f' : themeColor,
-                                            background: isWork ? 'rgba(77, 124, 15, 0.15)' : 'rgba(211, 84, 0, 0.1)',
+                                            color: isWork ? '#059669' : themeColor,
+                                            background: isWork ? 'rgba(16, 185, 129, 0.15)' : 'rgba(211, 84, 0, 0.1)',
                                             padding: '2px 8px',
                                             borderRadius: '4px',
                                             letterSpacing: '0.01em',
