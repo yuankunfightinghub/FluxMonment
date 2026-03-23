@@ -1,3 +1,4 @@
+// @v1.2.2 - Enhanced Submission Shortcut Logic
 import React, { useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, Mic, Paperclip, X, Film } from 'lucide-react';
@@ -53,12 +54,18 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
     }, [value]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        // 修改为 Shift + Enter 提交
-        if (e.key === 'Enter' && e.shiftKey) {
-            e.preventDefault();
-            if (value.trim() || pendingMedia.length > 0) {
-                onSubmit();
-                if (textareaRef.current) textareaRef.current.blur();
+        if (e.key === 'Enter') {
+            if (e.shiftKey) {
+                // Shift + Enter 提交
+                e.preventDefault();
+                console.log('[Shortcut] Shift + Enter detected, submitting moment...');
+                if (value.trim() || pendingMedia.length > 0) {
+                    onSubmit();
+                    if (textareaRef.current) textareaRef.current.blur();
+                }
+            } else {
+                // Enter only - 允许换行 (默认行为)
+                console.log('[Shortcut] Enter alone detected, allowing normal newline.');
             }
         }
     };
@@ -216,7 +223,7 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
                 onBlur={onBlur}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                placeholder={isLoading ? 'AI 正在思考脉络...' : '随时随地，记下你的闪念...'}
+                placeholder={isLoading ? 'AI 正在思考脉络...' : '随时随地，记下你的闪念... [Shift+Enter已就绪]'}
                 rows={1}
                 disabled={isLoading}
                 style={{
@@ -261,7 +268,7 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
                         whileTap={{ scale: hasContent ? 0.92 : 1 }}
                         onClick={onSubmit}
                         disabled={isLoading || !hasContent}
-                        title={hasContent ? '发送 (Shift + Enter)' : ''}
+                        title={hasContent ? '发送 (已设为 Shift+Enter 提交 v1.2.2)' : ''}
                         style={{
                             width: '32px',
                             height: '32px',
