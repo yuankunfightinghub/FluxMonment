@@ -1,4 +1,4 @@
-import type { EventThread, EventCategory, TimelineEntry, MediaAttachment, MoodType, DailyMemoryData } from '../types.js';
+import type { EventThread, EventCategory, MoodType } from '../types.js';
 
 /**
  * 核心 AI 逻辑配置文件 - 供 Web 前端与 MCP Server 共用

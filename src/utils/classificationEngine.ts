@@ -1,4 +1,4 @@
-import type { EventThread, EventCategory, MoodType, DailyMemoryData, MediaAttachment } from '../types.js';
+import type { EventThread, EventCategory, MoodType, DailyMemoryData, MediaAttachment, TimelineEntry } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 import { buildSharedPrompt, parseLLMResponse, pickAvatarVariant } from './aiLogicCore.js';
 

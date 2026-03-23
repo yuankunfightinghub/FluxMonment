@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CheckCircle2, Circle, Plus, RefreshCw, X, FileText, Save, Edit3, Loader2, Copy, Check,
-    Calendar, ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import type { EventThread, DailyMemoryData, TimelineEntry, EndOfDayTask } from '../types';
 import { generateDailySummary, generateWorkSummary } from '../utils/classificationEngine';
