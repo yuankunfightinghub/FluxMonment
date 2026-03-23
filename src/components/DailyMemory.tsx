@@ -139,7 +139,8 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
         }
 
         return () => { isMounted = false; };
-    }, [todayThreads, dateContext, cacheFingerprint]);
+        // 优化1: 不在这个依赖阵列中放入 todayThreads/cache，避免自动请求，点击或切换日期才查
+    }, [dateContext]);
 
     const handleManualRefresh = () => {
         fetchSummary(true);

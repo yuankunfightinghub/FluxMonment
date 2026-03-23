@@ -8,10 +8,11 @@ import { MomentStream } from './components/MomentStream';
 import { ViewTabs, type TabValue } from './components/ViewTabs';
 import { DailyMemory } from './components/DailyMemory';
 import { ExampleCards } from './components/ExampleCards';
-import { processAndAggregateInput, predictTopicTheme, detectUserIntent, generateEmbedding } from './utils/classificationEngine';
+import { processAndAggregateInput, predictTopicTheme, detectUserIntent, generateEmbedding, generateDailySummary } from './utils/classificationEngine';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { uploadMedia } from './lib/storage';
-import { isSameDay } from 'date-fns';
+import { isSameDay, format } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import type { EventCategory, MediaAttachment, EventThread } from './types';
 import { Search, X } from 'lucide-react';
 
@@ -150,8 +151,14 @@ function App() {
     ));
 
     try {
-      // 1. 意图极速推断 (SEARCH vs RECORD)
-      const intentAnalysis = await detectUserIntent(content);
+      const tStart = performance.now();
+      console.log('--- 🚀 提交流程开始 ---');
+
+      // 1. 意图极速推断与属性提取合二为一
+      const t0 = performance.now();
+      const intentAnalysis = await detectUserIntent(content, threads);
+      const t1 = performance.now();
+      console.log(`[耗时分析] 1. detectUserIntent (合并判别+属性抽取): ${(t1 - t0).toFixed(2)} ms`);
 
       if (intentAnalysis.intent === 'SEARCH') {
         const { query: aiQuery, tags, keywords } = intentAnalysis;
@@ -184,17 +191,58 @@ function App() {
       }
 
       // 2. 如果不是搜索，继续跑生成卡片的流程 (RECORD)
-      const { updatedThreads, highlightThreadId } = await processAndAggregateInput(
+      const t2 = performance.now();
+      const { updatedThreads, highlightThreadId, fullTextToEmbed } = await processAndAggregateInput(
         content,
         threads,
+        intentAnalysis as any,
         attachments.length > 0 ? attachments : undefined,
       );
+      const t3 = performance.now();
+      console.log(`[耗时分析] 2. processAndAggregateInput (包含归类分析 + 向量生成): ${(t3 - t2).toFixed(2)} ms`);
+
+      const t4 = performance.now();
       await addMoment(updatedThreads);
+      const t5 = performance.now();
+      console.log(`[耗时分析] 3. addMoment (同步到 Firestore): ${(t5 - t4).toFixed(2)} ms`);
+
+      const tEnd = performance.now();
+      console.log(`[耗时分析] === 提交并完成预处理的总耗时: ${(tEnd - tStart).toFixed(2)} ms ===`);
 
       setInputValue('');
       // Release object URLs
       pendingMedia.forEach(pm => URL.revokeObjectURL(pm.localUrl));
       setPendingMedia([]);
+
+      // 优化3: 针对当前插入的这条 Thread 后台异步提取 Embedding
+      generateEmbedding(fullTextToEmbed).then(async (embedding) => {
+          if (embedding && embedding.length > 0) {
+              const finalThreads = updatedThreads.map(t => 
+                  t.id === highlightThreadId ? { ...t, embedding } : t
+              );
+              await addMoment(finalThreads);
+              console.log('[Perf] 后台异步生成、保存 Embedding 完毕');
+          }
+      }).catch(e => console.error('[Perf] Async embedding 失败:', e));
+
+      // 优化1补充: 后台异步静默拉取 DailyMemory 的总结，使其缓存到本地。
+      // 如此做到 2 个分开的异步事务，且当用户后面切过去时，可以直接读缓存秒开。
+      const today = new Date();
+      const dateContextStr = format(today, 'yyyy年MM月dd日', { locale: zhCN });
+      const todayThreadsBg = updatedThreads.filter(t => isSameDay(t.lastUpdatedAt, today));
+      
+      const threadCount = todayThreadsBg.length;
+      const latestUpdate = todayThreadsBg.length > 0 ? Math.max(...todayThreadsBg.map(t => t.lastUpdatedAt)) : 0;
+      const cacheFingerprint = `${threadCount}_${latestUpdate}`;
+      const cacheKey = `daily_memory_${dateContextStr}`;
+
+      generateDailySummary(todayThreadsBg, dateContextStr).then(result => {
+          localStorage.setItem(cacheKey, JSON.stringify({
+              fingerprint: cacheFingerprint,
+              data: result
+          }));
+          console.log('[Perf] 后台异步静默写入 DailyMemory 新缓存完毕');
+      }).catch(e => console.error('[Perf] Background DailyMemory 预热失败:', e));
 
       // --- RECORD 成功后：强制退出搜索模式，切回主流 ---
       setIsSearchMode(false);
