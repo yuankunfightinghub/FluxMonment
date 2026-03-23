@@ -180,54 +180,44 @@ export function useFirestoreSync() {
         }
     }
 
-    // ── Write ────────────────────────────────────────────────────────────────
     /**
-     * 乐观更新策略：
-     *  1. 立刻将 updatedThreads 写入本地 state（卡片立刻出现）
-     *  2. 若已登录，异步写入 Firestore（onSnapshot 会二次确认）
+     * 极简加固版存储：负责将最新的 threads 集合持久化。
+     *  1. 保证 LocalStorage 绝对同步，优先于任何异步网络。
+     *  2. 隔离 Firestore 写入，防止主流程受阻。
      */
     async function addMoment(updatedThreads: EventThread[]) {
-        // Optimistic UI — always update local state immediately
-        const sorted = [...updatedThreads].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
-        setThreads(sorted);
-
-        const uid = user?.uid;
-        if (!uid) {
-            // Save to LocalStorage if not logged in
+        try {
+            // 对齐数据
+            const sorted = [...updatedThreads].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
+            
+            // 1. 本地冷备 (最高优先级同步写入，防刷新)
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sorted));
-            return;
-        }
+            
+            // 2. 内存更新
+            setThreads(sorted);
 
-        if (!db) return;
+            const uid = user?.uid;
+            if (!uid || !db) return;
 
-        const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
-
-        const writes = updatedThreads.map((thread) => {
-            const ref = doc(momentsCol, thread.id);
-            const dataToSave: any = {
-                title: thread.title,
-                category: thread.category,
-                tags: thread.tags,
-                entries: thread.entries,
-                lastUpdatedAt: thread.lastUpdatedAt,
-                mood: thread.mood ?? 'calm',
-                avatarVariant: thread.avatarVariant ?? 0,
-                _syncedAt: serverTimestamp(),
-            };
-
-            // 安全追加 Embedding 字段
-            if (thread.embedding && thread.embedding.length > 0) {
-                // 有些较新版的 Firebase SDK 推荐使用 vector(array)
-                // 但目前直接存放 number 数组在大量场景下也是符合预期的。
-                dataToSave.embedding = thread.embedding;
-            }
-
-            return setDoc(ref, dataToSave).catch((e) => {
-                console.error(`[Firebase] setDoc failed for thread ${thread.id}:`, e);
+            // 3. 异步云端增量/全量同步
+            const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+            
+            // 只写入受影响或全量，Firebase 本身具有离线支持，可以放心在 Promise.all 中跑
+            const writes = updatedThreads.map(thread => {
+                const ref = doc(momentsCol, thread.id);
+                const { id, ...dataToSave } = thread; // 排除 ID 字段以防冲突
+                return setDoc(ref, { 
+                    ...dataToSave, 
+                    _syncedAt: serverTimestamp() 
+                }, { merge: true }); // 使用 merge 模式更加安全
             });
-        });
 
-        await Promise.all(writes);
+            await Promise.all(writes);
+            console.info('[Storage] 数据库持久化成功');
+        } catch (e) {
+            console.error('[Storage] 持久化失败:', e);
+            throw e; // 抛出异常让 handleSubmit 捕获
+        }
     }
 
     async function deleteMoment(threadId: string, thread: EventThread) {
