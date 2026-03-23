@@ -55,10 +55,10 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-            if (e.shiftKey) {
-                // Shift + Enter 提交
+            if (e.metaKey || e.ctrlKey) {
+                // Cmd/Ctrl + Enter 提交
                 e.preventDefault();
-                console.log('[Shortcut] Shift + Enter detected, submitting moment...');
+                console.log('[Shortcut] Cmd/Ctrl + Enter detected, submitting moment...');
                 if (value.trim() || pendingMedia.length > 0) {
                     onSubmit();
                     if (textareaRef.current) textareaRef.current.blur();
@@ -223,7 +223,7 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
                 onBlur={onBlur}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                placeholder={isLoading ? 'AI 正在思考脉络...' : '随时随地，记下你的闪念... [Shift+Enter已就绪]'}
+                placeholder={isLoading ? 'AI 正在思考脉络...' : '随时随地，记下你的闪念... [Cmd+Enter已就绪]'}
                 rows={1}
                 disabled={isLoading}
                 style={{
@@ -268,7 +268,7 @@ export const InputCapsule: React.FC<InputCapsuleProps> = ({
                         whileTap={{ scale: hasContent ? 0.92 : 1 }}
                         onClick={onSubmit}
                         disabled={isLoading || !hasContent}
-                        title={hasContent ? '发送 (已设为 Shift+Enter 提交 v1.2.2)' : ''}
+                        title={hasContent ? '发送 (已设为 Cmd/Ctrl+Enter 提交)' : ''}
                         style={{
                             width: '32px',
                             height: '32px',
