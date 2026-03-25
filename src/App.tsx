@@ -17,7 +17,7 @@ import type { EventCategory, MediaAttachment, EventThread } from './types';
 import { Search, X } from 'lucide-react';
 
 function App() {
-  const { threads, user, isAuthChecked, signInWithGoogle, signOut, addMoment, deleteMoment, clearAllMoments } = useFirestoreSync();
+  const { threads, dailyTasksMap, user, isAuthChecked, signInWithGoogle, signOut, addMoment, saveDailyTasks, deleteMoment, clearAllMoments } = useFirestoreSync();
 
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -541,6 +541,8 @@ function App() {
             onDateChange={setMemoryDate}
             todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, memoryDate))}
             onDeleteEntry={deleteEntry}
+            dailyTasksMap={dailyTasksMap}
+            saveDailyTasks={saveDailyTasks}
           />
         )}
       </div>

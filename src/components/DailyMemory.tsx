@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CheckCircle2, Circle, Plus, RefreshCw, X, FileText, Save, Edit3, Loader2, Copy, Check,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, ArrowUpRight
 } from 'lucide-react';
 import type { EventThread, DailyMemoryData, TimelineEntry, EndOfDayTask } from '../types';
 import { generateDailySummary, generateWorkSummary } from '../utils/classificationEngine';
@@ -15,9 +15,14 @@ interface DailyMemoryProps {
     selectedDate: Date;
     onDateChange: (date: Date) => void;
     onDeleteEntry?: (threadId: string, entryId: string) => void;
+    dailyTasksMap?: Record<string, EndOfDayTask[]>;
+    saveDailyTasks?: (dateStr: string, tasks: EndOfDayTask[]) => Promise<void>;
 }
 
-export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selectedDate, onDateChange, onDeleteEntry }) => {
+export const DailyMemory: React.FC<DailyMemoryProps> = ({ 
+    todayThreads, selectedDate, onDateChange, onDeleteEntry, 
+    dailyTasksMap = {}, saveDailyTasks 
+}) => {
     const [data, setData] = useState<DailyMemoryData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [tasks, setTasks] = useState<EndOfDayTask[]>([]);
@@ -62,6 +67,9 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
     const fetchSummary = async (forceRefresh = false) => {
         setIsLoading(true);
         try {
+            // 优先检查云端/Prop 传入的任务，防止 AI 总结覆盖掉已有的
+            const cloudTasks = dailyTasksMap[dateContext];
+            
             // Check cache
             if (!forceRefresh) {
                 const cachedRaw = localStorage.getItem(cacheKey);
@@ -69,7 +77,8 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
                     const parsedCache = JSON.parse(cachedRaw);
                     if (parsedCache.fingerprint === cacheFingerprint && parsedCache.data) {
                         setData(parsedCache.data);
-                        setTasks(parsedCache.data.tasks || []);
+                        // 合并逻辑：以云端为准，如果云端没有才用缓存
+                        setTasks(cloudTasks || parsedCache.data.tasks || []);
 
                         // Also check for cached work summary
                         const cachedWorkSummary = localStorage.getItem(`work_summary_${dateContext}`);
@@ -85,6 +94,10 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
 
             // Fetch from LLM
             const result = await generateDailySummary(todayThreads, dateContext);
+            
+            // 重要：如果云端已有任务，不要让 AI 的结果覆盖它，除非是强制刷新且以前没任务
+            const finalTasks = cloudTasks || result.tasks || [];
+            result.tasks = finalTasks;
 
             // Save to cache
             localStorage.setItem(cacheKey, JSON.stringify({
@@ -93,13 +106,20 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
             }));
 
             setData(result);
-            setTasks(result.tasks || []);
+            setTasks(finalTasks);
         } catch (err) {
             console.error('Failed to load daily summary:', err);
         } finally {
             setIsLoading(false);
         }
     };
+
+    // 监听云端任务变化，实时响应
+    useEffect(() => {
+        if (dailyTasksMap[dateContext]) {
+            setTasks(dailyTasksMap[dateContext]);
+        }
+    }, [dailyTasksMap, dateContext]);
 
     const handleGenerateWorkSummary = async () => {
         setIsGeneratingWorkSummary(true);
@@ -126,6 +146,9 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
             setTimeout(() => setIsCopied(false), 2000);
         });
     };
+
+    const todayStr = format(new Date(), 'yyyy年MM月dd日', { locale: zhCN });
+    const isToday = todayStr === dateContext;
 
     useEffect(() => {
         let isMounted = true;
@@ -156,6 +179,7 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
     }, [todayThreads]);
 
     const updateCacheTasks = (newTasks: any[]) => {
+        // 1. 本地 LocalStorage 快照（保证刷新瞬间在）
         const cachedRaw = localStorage.getItem(cacheKey);
         if (cachedRaw) {
             try {
@@ -167,6 +191,10 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
             } catch (e) {
                 console.error('Failed to update task cache:', e);
             }
+        }
+        // 2. 云端同步（保证跨端在）
+        if (saveDailyTasks) {
+            saveDailyTasks(dateContext, newTasks);
         }
     };
 
@@ -190,6 +218,50 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
                 return next;
             });
             setNewTaskText('');
+        }
+    };
+
+    const moveTaskToToday = (task: EndOfDayTask) => {
+        const todayKey = `daily_memory_${todayStr}`;
+
+        // 1. 从当前显示日期的列表移除该任务（本任务在历史记录中消失，转到了今天）
+        const nextLocal = tasks.filter(t => t.id !== task.id);
+        setTasks(nextLocal);
+        updateCacheTasks(nextLocal);
+
+        // 2. 将任务注入“今天”
+        const todayCacheRaw = localStorage.getItem(todayKey);
+        let todayCache: any = null;
+        if (todayCacheRaw) {
+            try {
+                todayCache = JSON.parse(todayCacheRaw);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // 如果今天还没初始化缓存，则构建一个空载体
+        if (!todayCache || !todayCache.data) {
+             todayCache = { 
+                fingerprint: "0_0", 
+                data: {
+                    dateStr: todayStr,
+                    weather: '天气收集中',
+                    poeticMessage: '记录开始...',
+                    summary: '今日计划开启',
+                    deepMemories: [],
+                    tasks: []
+                }
+             };
+        }
+
+        const todayTasks = todayCache.data.tasks || [];
+        // 确保不重复添加
+        if (!todayTasks.find((t: any) => t.id === task.id)) {
+            todayTasks.push({ ...task, isCompleted: false });
+            todayCache.data.tasks = todayTasks;
+            localStorage.setItem(todayKey, JSON.stringify(todayCache));
+            console.log(`[Todo] 任务已成功转移至 ${todayStr}`);
         }
     };
 
@@ -721,28 +793,60 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({ todayThreads, selected
                                             }}>
                                                 {task.content}
                                             </span>
+                                            
+                                            {/* 功能：转移到今天（仅在历史日期显示，且未完成的任务） */}
+                                            {!isToday && !task.isCompleted && (
+                                                <motion.button
+                                                    whileHover={{ scale: 1.1, background: 'rgba(0,0,0,0.05)' }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveTaskToToday(task);
+                                                    }}
+                                                    style={{
+                                                        marginLeft: 'auto',
+                                                        padding: '6px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        background: 'transparent',
+                                                        color: 'var(--color-primary)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 500,
+                                                        lineHeight: 1
+                                                    }}
+                                                    title="转移到今天"
+                                                >
+                                                    <span style={{ fontSize: '10px', opacity: 0.8 }}>移至今日</span>
+                                                    <ArrowUpRight size={14} />
+                                                </motion.button>
+                                            )}
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>
-
-                                <div style={{
-                                    display: 'flex', alignItems: 'center', gap: '12px',
-                                    padding: '12px 16px', background: 'transparent',
-                                    borderRadius: '12px', border: '1px dashed var(--border-default)',
-                                }}>
-                                    <Plus size={20} color="var(--text-muted)" />
-                                    <input
-                                        value={newTaskText}
-                                        onChange={e => setNewTaskText(e.target.value)}
-                                        onKeyDown={addTask}
-                                        placeholder="添加新任务，按 Enter 键录入..."
-                                        style={{
-                                            border: 'none', background: 'transparent', outline: 'none',
-                                            fontSize: '14px', color: 'var(--text-default)', width: '100%',
-                                            fontFamily: 'inherit'
-                                        }}
-                                    />
-                                </div>
+                                
+                                {isToday && (
+                                    <div style={{
+                                        display: 'flex', alignItems: 'center', gap: '12px',
+                                        padding: '12px 16px', background: 'transparent',
+                                        borderRadius: '12px', border: '1px dashed var(--border-default)',
+                                    }}>
+                                        <Plus size={20} color="var(--text-muted)" />
+                                        <input
+                                            value={newTaskText}
+                                            onChange={e => setNewTaskText(e.target.value)}
+                                            onKeyDown={addTask}
+                                            placeholder="添加新任务，按 Enter 键录入..."
+                                            style={{
+                                                border: 'none', background: 'transparent', outline: 'none',
+                                                fontSize: '14px', color: 'var(--text-default)', width: '100%',
+                                                fontFamily: 'inherit'
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
