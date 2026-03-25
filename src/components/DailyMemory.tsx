@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CheckCircle2, Circle, Plus, RefreshCw, X, FileText, Save, Edit3, Loader2, Copy, Check,
-    ChevronLeft, ChevronRight, ArrowUpRight
+    ChevronLeft, ChevronRight, ArrowUpRight, Trash2
 } from 'lucide-react';
 import type { EventThread, DailyMemoryData, TimelineEntry, EndOfDayTask } from '../types';
 import { generateDailySummary, generateWorkSummary } from '../utils/classificationEngine';
@@ -262,6 +262,14 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
             todayCache.data.tasks = todayTasks;
             localStorage.setItem(todayKey, JSON.stringify(todayCache));
             console.log(`[Todo] 任务已成功转移至 ${todayStr}`);
+        }
+    };
+
+    const deleteTask = (id: string) => {
+        if (window.confirm('确定要删除这项待办吗？')) {
+            const nextLocal = tasks.filter(t => t.id !== id);
+            setTasks(nextLocal);
+            updateCacheTasks(nextLocal);
         }
     };
 
@@ -765,64 +773,113 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
                                             key={task.id}
                                             layout
                                             initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: task.isCompleted ? 0.6 : 1, scale: 1 }}
+                                            animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0, scale: 0.9 }}
-                                            whileTap={{ scale: 0.98 }}
+                                            whileHover="hover"
                                             style={{
                                                 display: 'flex', alignItems: 'center', gap: '12px',
                                                 padding: '12px 16px', background: 'var(--bg-card)',
                                                 borderRadius: '12px', border: '1px solid var(--border-default)',
-                                                cursor: 'pointer'
+                                                cursor: 'pointer',
+                                                position: 'relative',
+                                                transition: 'all 0.2s ease',
+                                                overflow: 'hidden'
                                             }}
                                             onClick={() => toggleTask(task.id)}
                                         >
+                                            {/* 鼠标移入背景变暗 */}
+                                            <motion.div 
+                                                variants={{ hover: { opacity: 0.4 } }}
+                                                initial={{ opacity: 0 }}
+                                                style={{ 
+                                                    position: 'absolute', inset: 0, background: 'var(--text-muted)', 
+                                                    zIndex: 0, pointerEvents: 'none', filter: 'blur(20px)' 
+                                                }} 
+                                            />
+
                                             <motion.div
+                                                style={{ zIndex: 1 }}
                                                 animate={task.isCompleted ? { rotate: 360, scale: [1, 1.2, 1] } : {}}
                                                 transition={{ duration: 0.4 }}
                                             >
                                                 {task.isCompleted ? (
-                                                    <CheckCircle2 size={20} color="var(--color-primary)" />
+                                                    <CheckCircle2 size={18} color="var(--color-primary)" />
                                                 ) : (
-                                                    <Circle size={20} color="var(--text-muted)" />
+                                                    <Circle size={18} color="var(--text-muted)" />
                                                 )}
                                             </motion.div>
+
                                             <span style={{
-                                                fontSize: '14px', color: task.isCompleted ? 'var(--text-muted)' : 'var(--text-default)',
+                                                zIndex: 1,
+                                                fontSize: '14px', 
+                                                color: task.isCompleted ? 'var(--text-muted)' : 'var(--text-default)',
                                                 textDecoration: task.isCompleted ? 'line-through' : 'none',
-                                                transition: 'color 0.3s'
+                                                transition: 'color 0.3s',
+                                                opacity: task.isCompleted ? 0.6 : 1,
+                                                flex: 1
                                             }}>
                                                 {task.content}
                                             </span>
                                             
-                                            {/* 功能：转移到今天（仅在历史日期显示，且未完成的任务） */}
-                                            {!isToday && !task.isCompleted && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', zIndex: 1 }}>
+                                                {/* 功能：转移到今天 */}
+                                                {!isToday && !task.isCompleted && (
+                                                    <motion.button
+                                                        variants={{ hover: { opacity: 1, x: 0 }, initial: { opacity: 0, x: 5 } }}
+                                                        initial="initial"
+                                                        whileHover={{ scale: 1.05, background: 'rgba(5, 150, 105, 0.1)' }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            moveTaskToToday(task);
+                                                        }}
+                                                        style={{
+                                                            padding: '6px 10px',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid rgba(5, 150, 105, 0.2)',
+                                                            background: 'transparent',
+                                                            color: 'var(--color-primary)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            lineHeight: 1
+                                                        }}
+                                                        title="转移到今天"
+                                                    >
+                                                        <span>移至今日</span>
+                                                        <ArrowUpRight size={14} />
+                                                    </motion.button>
+                                                )}
+
+                                                {/* 删除按钮 (优化：常驻显示低透明度，悬停加亮，点击确认) */}
                                                 <motion.button
-                                                    whileHover={{ scale: 1.1, background: 'rgba(0,0,0,0.05)' }}
-                                                    whileTap={{ scale: 0.95 }}
+                                                    variants={{ hover: { opacity: 1, scale: 1 }, initial: { opacity: 0.3, scale: 1 } }}
+                                                    initial="initial"
+                                                    whileHover={{ scale: 1.1, color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                                                    whileTap={{ scale: 0.9 }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        moveTaskToToday(task);
+                                                        deleteTask(task.id);
                                                     }}
                                                     style={{
-                                                        marginLeft: 'auto',
                                                         padding: '6px',
-                                                        borderRadius: '6px',
+                                                        borderRadius: '8px',
                                                         border: 'none',
                                                         background: 'transparent',
-                                                        color: 'var(--color-primary)',
+                                                        color: 'var(--text-muted)',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '4px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 500,
-                                                        lineHeight: 1
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.2s',
+                                                        opacity: 0.3 // 基础可见度
                                                     }}
-                                                    title="转移到今天"
+                                                    title="删除任务"
                                                 >
-                                                    <span style={{ fontSize: '10px', opacity: 0.8 }}>移至今日</span>
-                                                    <ArrowUpRight size={14} />
+                                                    <Trash2 size={15} />
                                                 </motion.button>
-                                            )}
+                                            </div>
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>
