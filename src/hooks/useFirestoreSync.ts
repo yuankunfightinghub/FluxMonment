@@ -16,7 +16,6 @@ import {
     serverTimestamp,
     getDocs,
     deleteDoc,
-    type Unsubscribe,
 } from 'firebase/firestore';
 import { auth, db, APP_ID } from '../lib/firebase';
 import type { EventThread, EndOfDayTask } from '../types';
