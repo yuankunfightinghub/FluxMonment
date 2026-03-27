@@ -265,6 +265,35 @@ function App() {
     }
   };
 
+  const handleConvertToTodo = async (thread: EventThread) => {
+    // 1. 获取摘要：使用标题作为任务内容
+    const taskContent = thread.title;
+    
+    // 2. 状态判断：根据所有条目的内容判断是否已完成
+    const fullText = thread.entries.map(e => e.content).join(' ').toLowerCase();
+    const isCompleted = /(完成|搞定|做好|done|checked|ok|解决了|已经)/i.test(fullText);
+    
+    // 3. 构建任务对象
+    const newTask = {
+      id: uuidv4(),
+      content: taskContent,
+      isCompleted
+    };
+
+    // 4. 获取今天的日期字符串
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    // 5. 获取当前已有的任务
+    const currentTasks = dailyTasksMap[todayStr] || [];
+    
+    // 6. 保存
+    await saveDailyTasks(todayStr, [newTask, ...currentTasks]);
+    
+    // 7. 切换到记忆视图并提示（可选，这里保持当前视图但给个开关提示更好，暂且直接保存）
+    console.log(`[Todo] 已将「${taskContent}」转为待办 (${isCompleted ? '已完成' : '进行中'})`);
+    alert(`已转为当日待办：${taskContent}`);
+  };
+
   const deleteEntry = async (threadId: string, entryId: string) => {
     const thread = threads.find(t => t.id === threadId);
     if (!thread) return;
@@ -517,6 +546,7 @@ function App() {
               threads={searchResults.map(r => r.thread)}
               onDelete={deleteMoment}
               onDeleteEntry={deleteEntry}
+              onConvertToTodo={handleConvertToTodo}
               isSearchMode={true}
             />
 
@@ -534,6 +564,7 @@ function App() {
             threads={threads}
             onDelete={deleteMoment}
             onDeleteEntry={deleteEntry}
+            onConvertToTodo={handleConvertToTodo}
           />
         ) : (
           <DailyMemory

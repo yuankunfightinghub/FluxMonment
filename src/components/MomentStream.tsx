@@ -7,10 +7,11 @@ interface MomentStreamProps {
     threads: EventThread[];
     onDelete?: (threadId: string, thread: EventThread) => void;
     onDeleteEntry?: (threadId: string, entryId: string) => void;
+    onConvertToTodo?: (thread: EventThread) => void;
     isSearchMode?: boolean;
 }
 
-export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete, onDeleteEntry }) => {
+export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete, onDeleteEntry, onConvertToTodo }) => {
     const [displayLimit, setDisplayLimit] = useState(10);
 
     if (threads.length === 0) {
@@ -51,6 +52,7 @@ export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete, o
                                 index={index}
                                 onDelete={() => onDelete?.(thread.id, thread)}
                                 onDeleteEntry={(entryId) => onDeleteEntry?.(thread.id, entryId)}
+                                onConvertToTodo={onConvertToTodo}
                             />
                         </div>
                     ))}

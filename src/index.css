@@ -100,17 +100,24 @@ textarea:focus {
   transform: translateY(-2px);
 }
 
-.notion-card .card-delete-btn {
-  opacity: 0;
+.notion-card:hover .card-delete-btn,
+.notion-card:hover .card-todo-btn {
+  opacity: 1;
 }
 
-.notion-card:hover .card-delete-btn {
-  opacity: 1;
+.notion-card .card-delete-btn,
+.notion-card .card-todo-btn {
+  opacity: 0;
 }
 
 .notion-card .card-delete-btn:hover {
   color: #ef4444 !important;
   background: #fef2f2 !important;
+}
+
+.notion-card .card-todo-btn:hover {
+  color: #059669 !important;
+  background: #f0fdf4 !important;
 }
 
 /* Entry-level delete: only show when hovering the specific row */

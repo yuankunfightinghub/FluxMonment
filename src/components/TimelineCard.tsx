@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, CheckSquare } from 'lucide-react';
 import type { EventThread } from '../types';
 import MomentAvatar from './MomentAvatar';
 import { MediaMosaic } from './MediaMosaic';
@@ -10,9 +10,10 @@ interface TimelineCardProps {
     index: number;
     onDelete?: () => void;
     onDeleteEntry?: (entryId: string) => void;
+    onConvertToTodo?: (thread: EventThread) => void;
 }
 
-export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDelete, onDeleteEntry }) => {
+export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDelete, onDeleteEntry, onConvertToTodo }) => {
     const isWork = thread.category.theme === 'cyber-blue';
 
     // Keep original icon / accent colors based on user feedback
@@ -118,6 +119,35 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                         title="永久删除此瞬间"
                     >
                         <Trash2 size={14} />
+                    </button>
+                )}
+
+                {/* Convert to Todo button (shows on group hover) */}
+                {onConvertToTodo && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onConvertToTodo(thread);
+                        }}
+                        className="card-todo-btn"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '6px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-placeholder)',
+                            transition: 'all 0.2s',
+                            padding: 0,
+                            flexShrink: 0,
+                        }}
+                        title="转为待办任务"
+                    >
+                        <CheckSquare size={14} />
                     </button>
                 )}
             </div>
