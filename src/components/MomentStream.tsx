@@ -30,7 +30,9 @@ export const MomentStream: React.FC<MomentStreamProps> = ({ threads, onDelete, o
         );
     }
 
-    const visibleThreads = threads.slice(0, displayLimit);
+    // 恢复为时间倒序排列（最新的在前，最旧的在后）
+    const sortedThreads = [...threads].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
+    const visibleThreads = sortedThreads.slice(0, displayLimit);
     const hasMore = threads.length > displayLimit;
 
     return (

@@ -76,18 +76,24 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
                 if (cachedRaw) {
                     const parsedCache = JSON.parse(cachedRaw);
                     if (parsedCache.fingerprint === cacheFingerprint && parsedCache.data) {
-                        setData(parsedCache.data);
-                        // 合并逻辑：以云端为准，如果云端没有才用缓存
-                        setTasks(cloudTasks || parsedCache.data.tasks || []);
-
-                        // Also check for cached work summary
-                        const cachedWorkSummary = localStorage.getItem(`work_summary_${dateContext}`);
-                        if (cachedWorkSummary) {
-                            setWorkSummary(cachedWorkSummary);
+                        // 额外检查：如果缓存里的任务为空，但此时 prop 里的任务其实是不空的（比如刚刚从 moments 同步过来）
+                        // 则不能直接用缓存，而应该继续向下运行或手动合并
+                        const hasCloudTasks = cloudTasks && cloudTasks.length > 0;
+                        const hasCacheTasks = parsedCache.data.tasks && parsedCache.data.tasks.length > 0;
+                        
+                        if (!hasCacheTasks && hasCloudTasks) {
+                            console.log('[DailyMemory] 缓存任务为空但云端有任务，跳过缓存读取');
+                        } else {
+                            setData(parsedCache.data);
+                            setTasks(cloudTasks || parsedCache.data.tasks || []);
+                            
+                            const cachedWorkSummary = localStorage.getItem(`work_summary_${dateContext}`);
+                            if (cachedWorkSummary) {
+                                setWorkSummary(cachedWorkSummary);
+                            }
+                            setIsLoading(false);
+                            return;
                         }
-
-                        setIsLoading(false);
-                        return;
                     }
                 }
             }
@@ -737,6 +743,40 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
                                     </div>
                                 ))
                             )
+                        )}
+
+                        {/* 兜底逻辑：如果 AI 没生成深度记忆，但今天其实有原始数据，则全部展示原始卡片摘要 */}
+                        {!isLoading && (!data?.deepMemories || data.deepMemories.length === 0) && todayThreads.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '8px' }}>
+                                    AI 正在努力思考中，先看看原始记录吧 🕯️
+                                </div>
+                                {todayThreads.map(thread => (
+                                    <div key={thread.id} style={{
+                                        background: '#FFFFFF',
+                                        border: '1px solid var(--border-default)',
+                                        borderRadius: '12px',
+                                        padding: '20px',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                                    }}>
+                                        <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-strong)', marginBottom: '8px' }}>
+                                            {thread.title}
+                                        </div>
+                                        <div style={{ fontSize: '13px', color: 'var(--text-default)', lineHeight: 1.5, opacity: 0.8 }}>
+                                            {thread.entries[0].content}
+                                        </div>
+                                        {thread.tags && thread.tags.length > 0 && (
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                                                {thread.tags.map((tag, i) => (
+                                                    <span key={i} style={{ fontSize: '10px', color: 'var(--color-primary)', background: 'rgba(var(--color-primary-rgb), 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                                                        #{tag.replace('#', '')}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
 
