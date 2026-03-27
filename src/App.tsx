@@ -229,7 +229,7 @@ function App() {
       // 如此做到 2 个分开的异步事务，且当用户后面切过去时，可以直接读缓存秒开。
       const today = new Date();
       const dateContextStr = format(today, 'yyyy年MM月dd日', { locale: zhCN });
-      const todayThreadsBg = updatedThreads.filter(t => isSameDay(t.lastUpdatedAt, today));
+      const todayThreadsBg = updatedThreads.filter(t => t.entries.some(e => isSameDay(new Date(e.timestamp), today)));
       
       const threadCount = todayThreadsBg.length;
       const latestUpdate = todayThreadsBg.length > 0 ? Math.max(...todayThreadsBg.map(t => t.lastUpdatedAt)) : 0;
@@ -570,7 +570,7 @@ function App() {
           <DailyMemory
             selectedDate={memoryDate}
             onDateChange={setMemoryDate}
-            todayThreads={threads.filter(t => isSameDay(t.lastUpdatedAt, memoryDate))}
+            todayThreads={threads.filter(t => t.entries.some(e => isSameDay(new Date(e.timestamp), memoryDate)))}
             onDeleteEntry={deleteEntry}
             dailyTasksMap={dailyTasksMap}
             saveDailyTasks={saveDailyTasks}

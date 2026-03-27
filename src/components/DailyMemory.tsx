@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { EventThread, DailyMemoryData, TimelineEntry, EndOfDayTask } from '../types';
 import { generateDailySummary, generateWorkSummary } from '../utils/classificationEngine';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { MediaMosaic } from './MediaMosaic';
 
@@ -179,10 +179,15 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
     const timelineItems = useMemo(() => {
         const items: { entry: TimelineEntry; thread: EventThread }[] = [];
         todayThreads.forEach(t => {
-            t.entries.forEach(e => items.push({ entry: e, thread: t }));
+            // 关键：只选取那些时间戳属于 selectedDate 的 entries
+            t.entries.forEach(e => {
+                if (isSameDay(new Date(e.timestamp), selectedDate)) {
+                    items.push({ entry: e, thread: t });
+                }
+            });
         });
         return items.sort((a, b) => a.entry.timestamp - b.entry.timestamp);
-    }, [todayThreads]);
+    }, [todayThreads, selectedDate]);
 
     const updateCacheTasks = (newTasks: any[]) => {
         // 1. 本地 LocalStorage 快照（保证刷新瞬间在）
