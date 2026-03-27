@@ -245,34 +245,32 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
             </div>
 
             {/* AI extracted keyword tags */}
-            {
-                thread.tags && thread.tags.length > 0 && (
-                    <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '6px',
-                        paddingTop: '4px',
-                    }}>
-                        {thread.tags.map((tag, i) => (
-                            <span
-                                key={i}
-                                style={{
-                                    fontSize: '12px',
-                                    fontWeight: 500,
-                                    color: isWork ? '#059669' : accentColor,
-                                    background: isWork ? 'rgba(16, 185, 129, 0.15)' : accentBg,
-                                    padding: '4px 10px',
-                                    borderRadius: '24px',
-                                    letterSpacing: '0.01em',
-                                }}
-                            >
-                                {tag.startsWith('#') ? tag : `#${tag}`}
-                            </span>
-                        ))}
-                    </div>
-                )
-            }
-        </motion.div >
+            {thread.tags && thread.tags.length > 0 && (
+                <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    paddingTop: '4px',
+                }}>
+                    {thread.tags.map((tag, i) => (
+                        <span
+                            key={i}
+                            style={{
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                color: isWork ? '#059669' : accentColor,
+                                background: isWork ? 'rgba(16, 185, 129, 0.15)' : accentBg,
+                                padding: '4px 10px',
+                                borderRadius: '24px',
+                                letterSpacing: '0.01em',
+                            }}
+                        >
+                            {tag.startsWith('#') ? tag : `#${tag}`}
+                        </span>
+                    ))}
+                </div>
+            )}
+        </motion.div>
     );
 };
 
