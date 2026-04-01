@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
     GoogleAuthProvider,
-    signInWithPopup,
+    getRedirectResult,
+    signInWithRedirect,
     signOut as firebaseSignOut,
     onAuthStateChanged,
     type User,
@@ -37,18 +38,12 @@ export function useFirestoreSync() {
     // ── Auth listener ────────────────────────────────────────────────────────
     useEffect(() => {
         if (!auth) {
-            // Firebase not configured — local-only mode
-            const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (localData) {
-                try {
-                    setThreads(JSON.parse(localData));
-                } catch (e) {
-                    console.error('[LocalStorage] Failed to parse:', e);
-                }
-            }
-            setIsAuthChecked(true);
+            // ... (local-only code)
             return;
         }
+
+        // 处理重定向登录结果
+        getRedirectResult(auth).catch(e => console.error('[Auth] Redirect result error:', e));
 
         const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
             setUser(firebaseUser);
@@ -62,12 +57,18 @@ export function useFirestoreSync() {
                         const localThreads: EventThread[] = JSON.parse(localData);
                         if (localThreads.length > 0) {
                             console.log('[Auth] Syncing local moments to cloud...');
-                            syncLocalToCloud(firebaseUser.uid, localThreads);
-                            // 同步后清除本地缓存，防止重复同步
-                            localStorage.removeItem(LOCAL_STORAGE_KEY);
+                            syncLocalToCloud(firebaseUser.uid, localThreads)
+                                .then(() => {
+                                    // 同步成功后清除本地缓存，防止丢失数据或重复同步
+                                    localStorage.removeItem(LOCAL_STORAGE_KEY);
+                                    console.log('[Auth] Local sync fully completed.');
+                                })
+                                .catch(err => {
+                                    console.error('[Auth] Local sync failed during upload:', err);
+                                });
                         }
                     } catch (e) {
-                        console.error('[Auth] Local sync failed:', e);
+                        console.error('[Auth] Local sync parse failed:', e);
                     }
                 }
                 attachListener(firebaseUser.uid);
@@ -157,10 +158,11 @@ export function useFirestoreSync() {
         // 遍历本地数据写入云端
         const writes = localThreads.map(thread => {
             const ref = doc(momentsCol, thread.id);
+            const { id, ...dataToSave } = thread; // Exclude id strictly
             return setDoc(ref, {
-                ...thread,
+                ...dataToSave,
                 _syncedFromLocalAt: serverTimestamp()
-            });
+            }, { merge: true });
         });
         await Promise.all(writes);
         console.log(`[Auth] Sync completed: ${localThreads.length} moments moved.`);
@@ -170,8 +172,7 @@ export function useFirestoreSync() {
     async function signInWithGoogle() {
         if (!auth) return;
         try {
-            await signInWithPopup(auth, googleProvider);
-            // onAuthStateChanged fires automatically after sign-in
+            await signInWithRedirect(auth, googleProvider);
         } catch (e) {
             console.error('[Firebase] Google sign-in failed:', e);
         }
