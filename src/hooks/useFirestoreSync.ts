@@ -8,7 +8,6 @@ import {
     type User,
 } from 'firebase/auth';
 import {
-    collection,
     doc,
     setDoc,
     query,
@@ -18,7 +17,7 @@ import {
     getDocs,
     deleteDoc,
 } from 'firebase/firestore';
-import { auth, db, APP_ID } from '../lib/firebase';
+import { auth, db, APP_ID, LEGACY_APP_IDS, getCollectionRef } from '../lib/firebase';
 import type { EventThread, EndOfDayTask } from '../types';
 const LOCAL_STORAGE_KEY = `fluxmoment_local_moments_${APP_ID}`;
 
@@ -34,11 +33,12 @@ export function useFirestoreSync() {
     const [isAuthChecked, setIsAuthChecked] = useState(false);
 
     const unsubSnapshotRef = useRef<(() => void) | null>(null);
+    const recoveredUsersRef = useRef<Set<string>>(new Set());
 
     // ── Auth listener ────────────────────────────────────────────────────────
     useEffect(() => {
         if (!auth) {
-            // ... (local-only code)
+            setIsAuthChecked(true);
             return;
         }
 
@@ -71,6 +71,7 @@ export function useFirestoreSync() {
                         console.error('[Auth] Local sync parse failed:', e);
                     }
                 }
+                void recoverLegacyMoments(firebaseUser.uid);
                 attachListener(firebaseUser.uid);
             } else {
                 // User signed out — tear down listener and clear cards
@@ -103,8 +104,8 @@ export function useFirestoreSync() {
 
         unsubSnapshotRef.current?.();
 
-        const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
-        const tasksCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'daily_tasks');
+        const momentsCol = getCollectionRef(db, APP_ID, uid, 'moments');
+        const tasksCol = getCollectionRef(db, APP_ID, uid, 'daily_tasks');
 
         const q = query(momentsCol, orderBy('lastUpdatedAt', 'desc'));
 
@@ -153,7 +154,7 @@ export function useFirestoreSync() {
     // ── Internal Sync ────────────────────────────────────────────────────────
     async function syncLocalToCloud(uid: string, localThreads: EventThread[]) {
         if (!db) return;
-        const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+        const momentsCol = getCollectionRef(db, APP_ID, uid, 'moments');
 
         // 遍历本地数据写入云端
         const writes = localThreads.map(thread => {
@@ -166,6 +167,40 @@ export function useFirestoreSync() {
         });
         await Promise.all(writes);
         console.log(`[Auth] Sync completed: ${localThreads.length} moments moved.`);
+    }
+
+    async function recoverLegacyMoments(uid: string) {
+        if (!db || recoveredUsersRef.current.has(uid)) return;
+
+        recoveredUsersRef.current.add(uid);
+
+        const canonicalMomentsCol = getCollectionRef(db, APP_ID, uid, 'moments');
+        const aliases = LEGACY_APP_IDS.filter(candidate => candidate !== APP_ID);
+
+        try {
+            for (const legacyAppId of aliases) {
+                const legacyMomentsCol = getCollectionRef(db, legacyAppId, uid, 'moments');
+                const legacySnap = await getDocs(legacyMomentsCol);
+
+                if (legacySnap.empty) continue;
+
+                console.warn(
+                    `[Recovery] Found ${legacySnap.size} legacy moments under APP_ID=${legacyAppId}. Migrating to ${APP_ID}.`,
+                );
+
+                const writes = legacySnap.docs.map((legacyDoc) =>
+                    setDoc(doc(canonicalMomentsCol, legacyDoc.id), {
+                        ...legacyDoc.data(),
+                        _recoveredFromAppId: legacyAppId,
+                        _recoveredAt: serverTimestamp(),
+                    }, { merge: true }),
+                );
+
+                await Promise.all(writes);
+            }
+        } catch (e) {
+            console.error('[Recovery] Legacy moments recovery failed:', e);
+        }
     }
 
     // ── Auth actions ─────────────────────────────────────────────────────────
@@ -199,7 +234,7 @@ export function useFirestoreSync() {
             const uid = user?.uid;
             if (!uid || !db) return;
 
-            const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+            const momentsCol = getCollectionRef(db, APP_ID, uid, 'moments');
             const writes = updatedThreads.map(thread => {
                 const ref = doc(momentsCol, thread.id);
                 const { id, ...dataToSave } = thread;
@@ -222,7 +257,7 @@ export function useFirestoreSync() {
     async function saveDailyTasks(dateStr: string, tasks: EndOfDayTask[]) {
         const uid = user?.uid;
         if (uid && db) {
-            const docRef = doc(db, 'artifacts', APP_ID, 'users', uid, 'daily_tasks', dateStr);
+            const docRef = doc(getCollectionRef(db, APP_ID, uid, 'daily_tasks'), dateStr);
             try {
                 await setDoc(docRef, { tasks, updatedAt: serverTimestamp() }, { merge: true });
                 console.info(`[Storage] 任务保存成功 (${dateStr})`);
@@ -251,7 +286,7 @@ export function useFirestoreSync() {
             );
             if (mediaTasks.length > 0) await Promise.all(mediaTasks);
 
-            const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+            const momentsCol = getCollectionRef(db, APP_ID, uid, 'moments');
             await deleteDoc(doc(momentsCol, threadId));
         } catch (e) {
             console.error(`[Firebase] Failed to delete moment ${threadId}:`, e);
@@ -267,7 +302,7 @@ export function useFirestoreSync() {
         }
 
         if (!db) return;
-        const momentsCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'moments');
+        const momentsCol = getCollectionRef(db, APP_ID, uid, 'moments');
         try {
             const snap = await getDocs(momentsCol);
             const deletions = snap.docs.map((d) => deleteDoc(d.ref));

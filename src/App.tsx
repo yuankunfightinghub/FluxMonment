@@ -66,11 +66,62 @@ function App() {
       }
     };
 
+    (window as any).fetchFullMoments = async () => {
+        console.log("--- 🕵️ 全量数据库记录诊断 ---");
+        const { db, APP_ID, LEGACY_APP_IDS, getCollectionRef } = await import('./lib/firebase');
+        const { getDocs } = await import('firebase/firestore');
+        const uid = (window as any).firebase_uid_override || user?.uid;
+        if (!uid || !db) {
+            console.error("❌ 未登录或数据库未连接。请先在页面登录。");
+            return;
+        }
+        
+        console.log(`正在扫描 UID [${uid}] 的 moments 路径，当前主 APP_ID = [${APP_ID}]`);
+
+        const reports = [];
+        for (const candidateAppId of LEGACY_APP_IDS) {
+          const colRef = getCollectionRef(db, candidateAppId, uid, 'moments');
+          const snap = await getDocs(colRef);
+          reports.push({
+            appId: candidateAppId,
+            count: snap.size,
+            docs: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+          });
+        }
+
+        console.table(reports.map(report => ({
+          APP_ID: report.appId,
+          条数: report.count,
+        })));
+
+        const primary = reports.find(report => report.appId === APP_ID);
+        if (!primary || primary.count === 0) {
+          console.warn("⚠️ 当前主路径下没有记录，请查看上面的 APP_ID 扫描结果。");
+        }
+
+        const richest = [...reports].sort((a, b) => b.count - a.count)[0];
+        if (!richest || richest.count === 0) {
+          console.warn("⚠️ 所有已知路径都为空。");
+          return [];
+        }
+
+        console.log(`✅ 路径 [${richest.appId}] 上找到 ${richest.count} 条记录：`);
+        console.table(richest.docs.map((d: any) => ({
+          ID: d.id,
+          标题: d.title || '无标题',
+          最后更新: new Date(d.lastUpdatedAt || 0).toLocaleString(),
+          条目数: d.entries?.length || 0,
+          主题: d.category?.theme || 'default'
+        })));
+        return richest.docs;
+    };
+
     return () => {
       delete (window as any).clearTestData;
       delete (window as any).backfillEmbeddings;
+      delete (window as any).fetchFullMoments;
     };
-  }, [clearAllMoments, addMoment, threads]);
+  }, [clearAllMoments, addMoment, threads, user]);
 
   useEffect(() => {
     if (inputValue.trim()) {
