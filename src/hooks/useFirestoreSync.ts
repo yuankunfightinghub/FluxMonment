@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
     GoogleAuthProvider,
     getRedirectResult,
+    signInWithPopup,
     signInWithRedirect,
     signOut as firebaseSignOut,
     onAuthStateChanged,
@@ -22,6 +23,9 @@ import type { EventThread, EndOfDayTask } from '../types';
 const LOCAL_STORAGE_KEY = `fluxmoment_local_moments_${APP_ID}`;
 
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+    prompt: 'select_account',
+});
 
 /**
  * Manages Firebase Google auth + real-time Firestore sync.
@@ -207,9 +211,14 @@ export function useFirestoreSync() {
     async function signInWithGoogle() {
         if (!auth) return;
         try {
-            await signInWithRedirect(auth, googleProvider);
+            await signInWithPopup(auth, googleProvider);
         } catch (e) {
-            console.error('[Firebase] Google sign-in failed:', e);
+            console.warn('[Firebase] Popup sign-in failed, falling back to redirect:', e);
+            try {
+                await signInWithRedirect(auth, googleProvider);
+            } catch (redirectError) {
+                console.error('[Firebase] Google sign-in failed:', redirectError);
+            }
         }
     }
 
