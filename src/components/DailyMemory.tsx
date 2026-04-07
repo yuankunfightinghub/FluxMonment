@@ -289,9 +289,10 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
         const [isHovered, setIsHovered] = useState(false);
         const timeStr = new Date(item.entry.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
-        // Work = Black, Life = Orange
         const isWork = item.thread.category.theme === 'cyber-blue';
         const themeColor = isWork ? '#050505' : '#d35400';
+        const tagTextColor = isWork ? '#059669' : '#e87533';
+        const tagBackgroundColor = isWork ? 'rgba(16, 185, 129, 0.15)' : 'rgba(232, 117, 51, 0.12)';
 
         const hasMedia = item.entry.attachments && item.entry.attachments.length > 0;
         const mediaUrl = hasMedia ? item.entry.attachments![0].url : null;
@@ -421,8 +422,8 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
                                         style={{
                                             fontSize: '11px',
                                             fontWeight: 500,
-                                            color: isWork ? '#059669' : themeColor,
-                                            background: isWork ? 'rgba(16, 185, 129, 0.15)' : 'rgba(211, 84, 0, 0.1)',
+                                            color: tagTextColor,
+                                            background: tagBackgroundColor,
                                             padding: '2px 8px',
                                             borderRadius: '4px',
                                             letterSpacing: '0.01em',
@@ -772,8 +773,19 @@ export const DailyMemory: React.FC<DailyMemoryProps> = ({
                                         </div>
                                         {thread.tags && thread.tags.length > 0 && (
                                             <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
-                                                {thread.tags.map((tag, i) => (
-                                                    <span key={i} style={{ fontSize: '10px', color: 'var(--color-primary)', background: 'rgba(var(--color-primary-rgb), 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                                {thread.tags.map((tag, i) => (
+                                                    <span
+                                                        key={i}
+                                                        style={{
+                                                            fontSize: '10px',
+                                                            color: thread.category.theme === 'cyber-blue' ? '#059669' : '#e87533',
+                                                            background: thread.category.theme === 'cyber-blue'
+                                                                ? 'rgba(16, 185, 129, 0.15)'
+                                                                : 'rgba(232, 117, 51, 0.12)',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px'
+                                                        }}
+                                                    >
                                                         #{tag.replace('#', '')}
                                                     </span>
                                                 ))}

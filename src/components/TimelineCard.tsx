@@ -15,11 +15,11 @@ interface TimelineCardProps {
 
 export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDelete, onDeleteEntry, onConvertToTodo }) => {
     const isWork = thread.category.theme === 'cyber-blue';
+    const tagTextColor = isWork ? '#059669' : '#e87533';
+    const tagBackgroundColor = isWork ? 'rgba(16, 185, 129, 0.15)' : 'rgba(232, 117, 51, 0.12)';
 
     // Keep original icon / accent colors based on user feedback
-    const accentColor = isWork ? 'var(--color-primary)' : '#e87533';
     const accentRaw = isWork ? '#006ebc' : '#e87533';
-    const accentBg = isWork ? 'var(--color-primary-accent-strong)' : 'rgba(232, 117, 51, 0.1)';
     const dotClass = isWork ? 'dot-work' : 'dot-life';
 
     return (
@@ -288,8 +288,8 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ thread, index, onDel
                             style={{
                                 fontSize: '11px',
                                 fontWeight: 500,
-                                color: isWork ? '#059669' : accentColor,
-                                background: isWork ? 'rgba(16, 185, 129, 0.15)' : accentBg,
+                                color: tagTextColor,
+                                background: tagBackgroundColor,
                                 padding: '4px 10px',
                                 borderRadius: '24px',
                                 letterSpacing: '0.01em',
